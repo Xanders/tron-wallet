@@ -37,9 +37,6 @@ module Wallet
         decrypted_data = @wallet.db.decrypt(encrypted, password)
         @wallet.account = account
         @wallet.address = decrypted_data["address"]
-        if @wallet.settings["transaction_password"] == "false"
-          @wallet.key = decrypted_data["key"]
-        end
         @wallet.prompt.ok("Succesfully logged to #{account}")
       rescue OpenSSL::Cipher::Error
         @wallet.prompt.error("Invalid password!")
@@ -51,7 +48,6 @@ module Wallet
 
       @wallet.account = nil
       @wallet.address = nil
-      @wallet.key = nil
       @wallet.prompt.say("Logged out")
     end
 
@@ -155,7 +151,6 @@ module Wallet
           @wallet.db.delete_account(account)
           @wallet.account = nil
           @wallet.address = nil
-          @wallet.key = nil
           @wallet.prompt.ok("Account #{account} deleted!")
         rescue OpenSSL::Cipher::Error
           @wallet.prompt.error("Invalid password!")

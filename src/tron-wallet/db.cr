@@ -40,7 +40,7 @@ module Wallet
 
       settings = get_settings
 
-      unless settings.keys.size == 3
+      unless settings.keys.size == 2
         @conn.exec("DELETE FROM settings")
         @wallet.prompt.warn("Wallet settings not found!")
         @wallet.controller.initial_setup
@@ -59,10 +59,9 @@ module Wallet
       return settings
     end
 
-    def update_settings(node_url, max_commission, password)
+    def update_settings(node_url, max_commission)
       @conn.exec("INSERT INTO settings VALUES (?, ?)", args: ["node_url", node_url])
       @conn.exec("INSERT INTO settings VALUES (?, ?)", args: ["max_commission", max_commission])
-      @conn.exec("INSERT INTO settings VALUES (?, ?)", args: ["transaction_password", password.to_s])
 
       return get_settings
     end

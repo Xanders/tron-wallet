@@ -18,21 +18,19 @@ module Wallet
   class Main
     getter prompt : Term::Prompt
     property settings
-    property account, address, key
+    property account, address
     property connected = false
     @controller : Wallet::Controller?
     @db : Wallet::DB?
     @node : Wallet::Node?
     @account : String?
     @address : String?
-    @key : String?
 
     def initialize
       @prompt = Term::Prompt.new()
       @settings = {} of String => String
       @account = nil
       @address = nil
-      @key = nil
       title
     end
 

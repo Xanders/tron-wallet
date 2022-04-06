@@ -96,7 +96,7 @@ module Wallet
         "function_selector" => "transfer(address,uint256)",
         "parameter" => params,
         "owner_address" => from,
-        "fee_limit" => 100000000,
+        "fee_limit" => @wallet.settings["max_commission"] * 1000000,
         "call_value" => 0,
         "visible" => true
       }.to_json)
@@ -115,11 +115,6 @@ module Wallet
     end
 
     def sign_transaction(transaction : JSON::Any, private_key : String)
-      # cutted_transaction = {
-      #   "txID" => transaction["txID"].as_s,
-      #   "raw_data" => transaction["raw_data"]
-      # }
-
       body = {
         "transaction" => transaction,
         "privateKey" => private_key,
@@ -138,12 +133,6 @@ module Wallet
 
     def get_now_block
       res = @conn.get("/wallet/getnowblock")
-
-      return JSON.parse(res.body)
-    end
-
-    def list_nodes
-      res = @conn.get("/wallet/listnodes")
 
       return JSON.parse(res.body)
     end
