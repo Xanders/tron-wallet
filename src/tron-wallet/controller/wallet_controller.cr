@@ -37,7 +37,8 @@ module Wallet
         decrypted_data = @wallet.db.decrypt(encrypted, password)
         @wallet.account = account
         @wallet.address = decrypted_data["address"]
-        @wallet.prompt.ok("Succesfully logged to #{account}")
+        @wallet.prompt.ok("Succesfully logged to #{account} (#{@wallet.address})")
+        process("balance")
       rescue OpenSSL::Cipher::Error
         @wallet.prompt.error("Invalid password!")
       end
