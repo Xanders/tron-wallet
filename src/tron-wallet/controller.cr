@@ -1,3 +1,12 @@
+macro generate_case(namespace, list)
+  case command
+  {% for value in list %}
+  when {{value}} then {{namespace.id}}_{{value.id}}(args)
+  {% end %}
+  else @wallet.prompt.error("Command not found")
+  end
+end
+
 macro initialize_commands(list)
   def process(command : String)
     command, *args = command.split(" ")
@@ -9,19 +18,11 @@ macro initialize_commands(list)
     {% for value in list %}
     when {{value}} then {{value.id}}(args)
     {% end %}
-    else @wallet.prompt.error("Command not found")
+    else
+      generate_case("wallet", %w(login logout list create import delete address backup balance send))
     end
   ensure
     @wallet.prompt.say("\n")
-  end
-end
-
-macro generate_case(namespace, list)
-  case command
-  {% for value in list %}
-  when {{value}} then {{namespace.id}}_{{value.id}}(args)
-  {% end %}
-  else @wallet.prompt.error("Command not found")
   end
 end
 

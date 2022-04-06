@@ -3,6 +3,8 @@ module Wallet
     def help(args)
       @wallet.prompt.say("
 • wallet: list wallet commands
+    # all wallet commands linked to root namespace
+    # you can send all commands below without `wallet`
     login (*account_name): login into account
     logout: log out from account
     list: list available accounts
