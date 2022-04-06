@@ -1,0 +1,19 @@
+name: tron-wallet
+version: 0.1.0
+
+authors:
+  - Lexxie Belle <lexxie@kek.ltd>
+
+description: |
+  Simple console wallet
+
+dependencies:
+  term-prompt:
+    github: crystal-term/prompt
+  sqlite3:
+    github: crystal-lang/crystal-sqlite3
+    version: "0.18.0"
+  crypt:
+    github: nicolab/crystal-crypt
+
+# license: MIT
