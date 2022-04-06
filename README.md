@@ -13,7 +13,7 @@ crystal build src/tron-wallet.cr -o /usr/local/bin/tron-wallet --warnings none
 
 ### TODO
 * refactor source, add with_decrypt block
-* show energy and bandswith in balance
+* show energy and bandwith in balance
 * add stacking TRX
 * add inline swap coins through exchange
 * add autocomplete commands by TAB
