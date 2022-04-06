@@ -75,8 +75,12 @@ module Wallet
       amount = (amount * 1000000).to_i64
       transaction = create_trc20_transaction(from: @wallet.address.not_nil!, to: address, contract: contract, amount: amount)
 
-      if transaction["transaction"]["ret"].as_a.first.as_h.any?
-        return "FAILED", transaction["result"]["message"].as_s, transaction["transaction"]["txID"]
+      transaction_id = transaction["transaction"]? ? transaction["transaction"]["txID"].as_s : ""
+
+      if !transaction["transaction"]?
+        return "FAILED", transaction["result"]["message"].as_s, transaction_id
+      elsif transaction["transaction"]["ret"].as_a.first.as_h.any?
+        return "FAILED", transaction["result"]["message"].as_s, transaction_id
       else
         signed = sign_transaction(transaction["transaction"], private_key)
         sended = send_transaction(signed)
@@ -91,16 +95,20 @@ module Wallet
     def create_trc20_transaction(from : String, to : String,  contract : String, amount : Int64)
       params = Wallet::Utils.tron_params(TronAddress.to_hex(to), amount.to_s(16))
 
-      res = @conn.post("/wallet/triggerconstantcontract", body: {
+      body = {
         "contract_address" => contract,
         "function_selector" => "transfer(address,uint256)",
         "parameter" => params,
         "owner_address" => from,
-        "fee_limit" => @wallet.settings["max_commission"] * 1000000,
+        "fee_limit" => @wallet.settings["max_commission"].to_i64 * 1000000,
         "call_value" => 0,
         "visible" => true
-      }.to_json)
+      }
 
+      puts body
+
+      res = @conn.post("/wallet/triggerconstantcontract", body: body.to_json)
+      puts res.body
       return JSON.parse(res.body)
     end
 
