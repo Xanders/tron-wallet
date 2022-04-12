@@ -23,6 +23,8 @@ module Wallet
     end
 
     def contracts_create(args)
+      return unless connected?
+
       contracts = @wallet.db.get_contracts
 
       name = if args.any?

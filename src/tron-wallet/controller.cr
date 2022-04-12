@@ -10,16 +10,13 @@ end
 macro initialize_commands(list)
   def process(command : String)
     command, *args = command.split(" ")
-    if !@wallet.connected && command != "settings" 
-      return @wallet.prompt.error("Wallet not connected")
-    end
     
     case command
     {% for value in list %}
     when {{value}} then {{value.id}}(args)
     {% end %}
     else
-      generate_case("wallet", %w(login logout list create import delete address backup balance send))
+      generate_case("wallet", %w(login logout list create import delete address backup balance send rename))
     end
   ensure
     @wallet.prompt.say("\n")
@@ -37,16 +34,24 @@ module Wallet
     include ServiceController
 
     @wallet : Wallet::Main
-    initialize_commands(%w(wallet contracts book settings help block))
+    initialize_commands(%w(wallet contracts book settings connect block help))
     def initialize(@wallet); end
 
     def initial_setup
       settings_edit(reconnect: false)
     end
 
+    def connected?
+      unless @wallet.connected
+        @wallet.prompt.error("Wallet not connected, use `connect` command")
+        return false
+      end
+      true
+    end
+
     def authorized?
       unless @wallet.account
-        @wallet.prompt.error("Not logged yet")
+        @wallet.prompt.error("Not logged yet, use `login` command")
         return false
       end
       true

@@ -1,0 +1,13 @@
+.git
+.gitignore
+
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+
+build
+.home
+
+Makefile
+README.md

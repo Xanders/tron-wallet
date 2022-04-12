@@ -15,6 +15,7 @@ module Wallet
     backup (*account_name): show account address & private key
     balance (*account_name): show account balance
     send: send TRX or TRC20 token
+    rename (*old_name (*new_name)): change account name
 
 • contracts: list contracts commands
     list: list available contracts
@@ -30,6 +31,7 @@ module Wallet
     show: show application settings
     edit: edit application settings
 
+• connect (*node_url): try to connect to the node
 • block: print current block number
 • help: print all supported commands
 
@@ -37,7 +39,25 @@ module Wallet
 ")
     end
 
+    def connect(args)
+      current_node_url = @wallet.db.get_settings["node_url"]
+
+      if args.any?
+        new_node_url = args.shift
+        @wallet.db.update_settings(node_url: new_node_url)
+        @wallet.prompt.warn("Node URL was changed in settings from #{current_node_url} to #{new_node_url}")
+        current_node_url = new_node_url
+        @wallet.node.reconnect
+      end
+
+      if @wallet.node.status
+        @wallet.prompt.say("Succesfully connnected to #{current_node_url}")
+      end
+    end
+
     def block(args)
+      return unless connected?
+
       res = @wallet.node.get_now_block
       id = res["blockID"].as_s
       number = res.dig("block_header", "raw_data", "number").as_i64

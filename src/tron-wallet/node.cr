@@ -34,7 +34,7 @@ module Wallet
       }.to_json)
 
       body = JSON.parse(res.body)
-      balance = body["constant_result"]? ? body["constant_result"].as_a.first.as_s.to_i64(16) : 0
+      balance = body["constant_result"]? ? body["constant_result"].as_a.first.as_s.to_i64(16) : 0_i64
       return balance / 1000000
     end
 
@@ -145,13 +145,12 @@ module Wallet
     def status
       @conn.get("/")
       @wallet.connected = true
-    rescue
+    rescue error
+      @wallet.prompt.error("Cannot connect to #{@wallet.settings["node_url"]} (#{error.message})")
       @wallet.connected = false
-      @wallet.prompt.error("Cannot connect to #{@wallet.settings["node_url"]}")
     end
 
     def reconnect
-      puts @wallet.settings
       uri = URI.parse @wallet.settings["node_url"]
       @conn = HTTP::Client.new uri
     end

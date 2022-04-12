@@ -59,9 +59,9 @@ module Wallet
       return settings
     end
 
-    def update_settings(node_url, max_commission)
-      @conn.exec("INSERT INTO settings VALUES (?, ?)", args: ["node_url", node_url])
-      @conn.exec("INSERT INTO settings VALUES (?, ?)", args: ["max_commission", max_commission])
+    def update_settings(node_url : String? = nil, max_commission : String? = nil)
+      @conn.exec("INSERT INTO settings VALUES (?, ?)", args: ["node_url", node_url]) if node_url
+      @conn.exec("INSERT INTO settings VALUES (?, ?)", args: ["max_commission", max_commission]) if max_commission
 
       return get_settings
     end
@@ -98,6 +98,10 @@ module Wallet
 
     def delete_account(name)
       @conn.exec("DELETE FROM accounts WHERE name = ?", args: [name])
+    end
+
+    def rename_account(from, to)
+      @conn.exec("UPDATE accounts SET name = ? WHERE name = ?", args: [to, from])
     end
 
     def get_contracts
