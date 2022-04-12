@@ -8,6 +8,13 @@
 crystal build src/tron-wallet.cr -o /usr/local/bin/tron-wallet --warnings none
 ```
 
+### With Docker
+
+```bash
+make pull
+make tw
+```
+
 ### Usage
 * print help for list available commands
 

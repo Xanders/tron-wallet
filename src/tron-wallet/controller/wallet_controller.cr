@@ -58,6 +58,8 @@ module Wallet
     end
 
     def wallet_create(args)
+      return unless connected?
+
       @wallet.prompt.warn("REMEMBER YOUR PASSWORD! YOU CAN'T RESTORE PRIVATE KEY WITHOUT IT!")
       name = if args.any?
         args.shift
@@ -210,6 +212,8 @@ module Wallet
     end
 
     def wallet_balance(args)
+      return unless connected?
+
       account = if args.any?
         args.shift
       else
@@ -220,15 +224,7 @@ module Wallet
       address = if account == @wallet.account
         @wallet.address
       else
-        password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
-        data = @wallet.db.get_account(account)
-        encrypted = data[account]
-        begin
-          data = @wallet.db.decrypt(encrypted, password)
-          data["address"]
-        rescue OpenSSL::Cipher::Error
-          @wallet.prompt.error("Invalid password!")
-        end
+        get_account_address(account)
       end
 
       @wallet.prompt.say("TRX: #{@wallet.node.get_balance(address)}")
@@ -236,37 +232,51 @@ module Wallet
       contracts.each do |name, contract|
         @wallet.prompt.say("#{name}: #{@wallet.node.get_token_balance(address, contract)}")
       end
+    rescue OpenSSL::Cipher::Error
+      @wallet.prompt.error("Invalid password!")
     end
 
     def wallet_send(args)
+      return unless connected?
       return unless authorized?
       contracts = @wallet.db.get_contracts
+      accounts = @wallet.db.get_accounts
       book = @wallet.db.get_book
 
-      method = if book.any?
-        @wallet.prompt.select("Select method", ["Select from addressbook", "Enter address"])
-      else
-        "Enter address"
-      end
-
-      address = if method == "Enter address"
+      address = case @wallet.prompt.select("Select method", ["Enter address", "Select from addressbook", "Select another account in the wallet"])
+      when "Enter address"
         @wallet.prompt.ask("Address", required: true).not_nil!
-      else
+      when "Select from addressbook"
+        unless book.any?
+          @wallet.prompt.warn("There is no records in the addressbook, use `book` command")
+          return
+        end
+
         @wallet.prompt.select("Select record") do |menu|
           book.each do |k, v|
             menu.choice "#{k} (#{v})", v
           end
         end
+      when "Select another account in the wallet"
+        if accounts.size == 1
+          @wallet.prompt.warn("There is only one account it the wallet!")
+          return
+        end
+
+        account = @wallet.prompt.select("Select account", accounts - [@wallet.account])
+        get_account_address(account)
       end
 
       coin = @wallet.prompt.select("Select coin", ["TRX"] + contracts.keys).not_nil!
 
       coin == "TRX" ? wallet_send_trx(address.not_nil!) : wallet_send_token(address.not_nil!, coin, contracts)
+    rescue OpenSSL::Cipher::Error
+      @wallet.prompt.error("Invalid password!")
     end
 
     def wallet_send_trx(to_address : String)
       @wallet.prompt.say("Balance: #{@wallet.node.get_balance(@wallet.address)}")
-      amount = @wallet.prompt.ask("Enter amount", required: true).not_nil!
+      amount = @wallet.prompt.ask("Enter amount:", required: true).not_nil!
       password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
       account = @wallet.account
       data = @wallet.db.get_account(account)
@@ -340,6 +350,63 @@ module Wallet
       rescue OpenSSL::Cipher::Error
         @wallet.prompt.error("Invalid password!")
       end
+    end
+
+    def wallet_rename(args)
+      from, to = case {@wallet.account, args[0]?, args[1]?}
+      when {_, String, String}
+        {args[0], args[1]}
+      when {String, String, nil}
+        {
+          @wallet.prompt.ask("Old name:", default: @wallet.account, required: true).not_nil!,
+          @wallet.prompt.ask("New name:", default: args[0], required: true).not_nil!
+        }
+      when {String, nil, nil}
+        {
+          @wallet.prompt.ask("Old name:", default: @wallet.account, required: true).not_nil!,
+          @wallet.prompt.ask("New name:", required: true).not_nil!
+        }
+      when {nil, String, nil}
+        {
+          @wallet.prompt.ask("Old name:", default: args[0], required: true).not_nil!,
+          @wallet.prompt.ask("New name:", required: true).not_nil!
+        }
+      when {nil, nil, nil}
+        {
+          @wallet.prompt.ask("Old name:", required: true).not_nil!,
+          @wallet.prompt.ask("New name:", required: true).not_nil!
+        }
+      else
+        raise "Something went wrong!"
+      end
+
+      accounts = @wallet.db.get_accounts
+
+      unless accounts.includes? from
+        @wallet.prompt.error("There is no account named #{from}!")
+        return
+      end
+
+      if accounts.includes? to
+        @wallet.prompt.error("Account named #{to} already exists!")
+        return
+      end
+
+      @wallet.db.rename_account(from, to)
+
+      @wallet.prompt.ok("Account #{from} was renamed to #{to}!")
+
+      if @wallet.account == from
+        @wallet.account = to
+      end
+    end
+
+    def get_account_address(account)
+      password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
+      data = @wallet.db.get_account(account)
+      encrypted = data[account]
+      data = @wallet.db.decrypt(encrypted, password)
+      data["address"]
     end
   end
 end

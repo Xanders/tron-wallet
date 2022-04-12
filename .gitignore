@@ -1,3 +1,7 @@
 .git
 lib
 build
+
+# For Docker
+.home
+docker-compose.override.yml
