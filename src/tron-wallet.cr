@@ -48,7 +48,7 @@ module Wallet
     end
 
     def title
-      prompt.say("Tron wallet 0.1.0")
+      prompt.say("Tron wallet 0.1.1")
       prompt.say("Print `help` to see all commands")
       prompt.say("\n")
     end

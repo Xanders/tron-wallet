@@ -19,12 +19,12 @@ module Wallet
 
 • contracts: list contracts commands
     list: list available contracts
-    add (*contract_name (*contract_address)): add new TRC-20 contract
+    create (*contract_name (*contract_address)): add new TRC-20 contract
     delete (*contract_name): delete contract
 
 • book: list addressbook commands
     list: list available book addresses
-    add: add new record to addressbook
+    create: add new record to addressbook
     delete: delete addressbook record
 
 • settings: list settings commands
