@@ -8,7 +8,7 @@ clean:
 	rm ./build/*
 
 install:
-	sudo cp build/tron-wallet /usr/local/bin
+	cp build/tron-wallet /usr/local/bin
 
 # Show this help
 help:
