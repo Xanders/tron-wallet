@@ -23,6 +23,16 @@ module Wallet
       return balance / 1000000
     end
 
+    def get_bandwidth(address)
+      res = @conn.post("/wallet/getaccountnet", body: {"address" => address, "visible" => true}.to_json)
+
+      # @wallet.prompt.warn(JSON.parse(res.body))
+
+      body = JSON.parse(res.body)
+      bw = body["freeNetLimit"]? ? JSON.parse(res.body)["freeNetLimit"].as_i64 : 0_i64
+      return bw
+    end
+
     def get_token_balance(address, contract)
       params = Wallet::Utils.tron_params(TronAddress.to_hex(address.not_nil!))
       res = @conn.post("/wallet/triggerconstantcontract", body: {
