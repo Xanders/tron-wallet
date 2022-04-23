@@ -5,6 +5,7 @@
 * install libreadline-dev, libsqlite3-dev
 
 ```
+shards install
 crystal build src/tron-wallet.cr -o /usr/local/bin/tron-wallet --warnings none
 ```
 

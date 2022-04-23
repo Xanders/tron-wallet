@@ -37,7 +37,7 @@ module Wallet
         decrypted_data = @wallet.db.decrypt(encrypted, password)
         @wallet.account = account
         @wallet.address = decrypted_data["address"]
-        @wallet.prompt.ok("Succesfully logged to #{account} (#{@wallet.address})")
+        @wallet.prompt.ok("Succesfully logged to #{account} (#{@wallet.address}) [ https://tronscan.org/#/address/#{@wallet.address} ]")
       rescue OpenSSL::Cipher::Error
         @wallet.prompt.error("Invalid password!")
       end
