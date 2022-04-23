@@ -7,6 +7,9 @@ release:
 clean:
 	rm ./build/*
 
+install:
+	sudo cp build/tron-wallet /usr/local/bin
+
 # Show this help
 help:
 	@cat $(MAKEFILE_LIST) | docker run --rm -i xanders/make-help
