@@ -29,9 +29,9 @@ module Wallet
       # @wallet.prompt.warn(JSON.parse(res.body))
 
       body = JSON.parse(res.body)
-      limit = body["freeNetLimit"]? ? JSON.parse(res.body)["freeNetLimit"].as_i64 : 0_i64
-      used = body["freeNetUsed"]? ? JSON.parse(res.body)["freeNetUsed"].as_i64 : 0_i64
-      energy = body["EnergyLimit"]? ? JSON.parse(res.body)["EnergyLimit"].as_i64 : 0_i64
+      limit = body["freeNetLimit"]? ? body["freeNetLimit"].as_i64 : 0_i64
+      used = body["freeNetUsed"]? ? body["freeNetUsed"].as_i64 : 0_i64
+      energy = body["EnergyLimit"]? ? body["EnergyLimit"].as_i64 : 0_i64
       return {
         "bandwidth_used" => limit - used,
         "bandwidth_limit" => limit,
