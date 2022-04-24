@@ -23,14 +23,20 @@ module Wallet
       return balance / 1000000
     end
 
-    def get_bandwidth(address)
-      res = @conn.post("/wallet/getaccountnet", body: {"address" => address, "visible" => true}.to_json)
+    def get_net_stats(address)
+      res = @conn.post("/wallet/getaccountresource", body: {"address" => address, "visible" => true}.to_json)
 
       # @wallet.prompt.warn(JSON.parse(res.body))
 
       body = JSON.parse(res.body)
-      bw = body["freeNetLimit"]? ? JSON.parse(res.body)["freeNetLimit"].as_i64 : 0_i64
-      return bw
+      limit = body["freeNetLimit"]? ? JSON.parse(res.body)["freeNetLimit"].as_i64 : 0_i64
+      used = body["freeNetUsed"]? ? JSON.parse(res.body)["freeNetUsed"].as_i64 : 0_i64
+      energy = body["EnergyLimit"]? ? JSON.parse(res.body)["EnergyLimit"].as_i64 : 0_i64
+      return {
+        "bandwidth_used" => limit - used,
+        "bandwidth_limit" => limit,
+        "energy" => energy
+      }
     end
 
     def get_token_balance(address, contract)
