@@ -33,7 +33,7 @@ module Wallet
       used = body["freeNetUsed"]? ? body["freeNetUsed"].as_i64 : 0_i64
       energy = body["EnergyLimit"]? ? body["EnergyLimit"].as_i64 : 0_i64
       return {
-        "bandwidth_used" => limit - used,
+        "bandwidth_free" => limit - used,
         "bandwidth_limit" => limit,
         "energy" => energy
       }
