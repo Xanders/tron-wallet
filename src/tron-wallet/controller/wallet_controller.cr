@@ -227,6 +227,8 @@ module Wallet
         get_account_address(account)
       end
 
+      stats = @wallet.node.get_net_stats(address)
+      @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]} Energy: #{stats["energy"]}")
       @wallet.prompt.say("TRX: #{@wallet.node.get_balance(address)}")
       contracts = @wallet.db.get_contracts
       contracts.each do |name, contract|

@@ -23,6 +23,22 @@ module Wallet
       return balance / 1000000
     end
 
+    def get_net_stats(address)
+      res = @conn.post("/wallet/getaccountresource", body: {"address" => address, "visible" => true}.to_json)
+
+      # @wallet.prompt.warn(JSON.parse(res.body))
+
+      body = JSON.parse(res.body)
+      limit = body["freeNetLimit"]? ? body["freeNetLimit"].as_i64 : 0_i64
+      used = body["freeNetUsed"]? ? body["freeNetUsed"].as_i64 : 0_i64
+      energy = body["EnergyLimit"]? ? body["EnergyLimit"].as_i64 : 0_i64
+      return {
+        "bandwidth_free" => limit - used,
+        "bandwidth_limit" => limit,
+        "energy" => energy
+      }
+    end
+
     def get_token_balance(address, contract)
       params = Wallet::Utils.tron_params(TronAddress.to_hex(address.not_nil!))
       res = @conn.post("/wallet/triggerconstantcontract", body: {
