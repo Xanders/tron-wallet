@@ -16,6 +16,7 @@ module Wallet
     balance (*account_name): show account balance
     send: send TRX or TRC20 token
     rename (*old_name (*new_name)): change account name
+    claim: claim TRX for voting rewards
 
 • contracts: list contracts commands
     list: list available contracts
