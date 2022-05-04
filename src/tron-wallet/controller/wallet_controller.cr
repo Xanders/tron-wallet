@@ -37,7 +37,8 @@ module Wallet
         decrypted_data = @wallet.db.decrypt(encrypted, password)
         @wallet.account = account
         @wallet.address = decrypted_data["address"]
-        @wallet.prompt.ok("Succesfully logged to #{account} (#{@wallet.address}) [ https://tronscan.org/#/address/#{@wallet.address} ]")
+        @wallet.prompt.ok("Succesfully logged to #{account} (#{@wallet.address})") 
+        @wallet.prompt.ok("https://tronscan.org/#/address/#{@wallet.address}")
       rescue OpenSSL::Cipher::Error
         @wallet.prompt.error("Invalid password!")
       end
@@ -228,7 +229,7 @@ module Wallet
       end
 
       stats = @wallet.node.get_net_stats(address)
-      @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]} Energy: #{stats["energy"]}")
+      @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]}. Energy: #{stats["energy"]}")
       reward = @wallet.node.get_unclaimed_rewards(address)
       if reward > 0
         @wallet.prompt.say("Unclaimed rewards: #{reward} TRX")
@@ -237,7 +238,7 @@ module Wallet
       # @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]} Energy: #{stats["energy"]}")
       balance_info = @wallet.node.get_balance(address)
     
-      @wallet.prompt.say("TRX: #{balance_info["balance"]}. Frozen: #{balance_info["frozen"]} (E: #{balance_info["frozen_balance_for_energy"]} BW: #{balance_info["frozen_balance_for_bandwidth"]}) Votes: #{balance_info["votes"]}")
+      @wallet.prompt.say("TRX: #{balance_info["balance"]}. Frozen: #{balance_info["frozen"]} (E: #{balance_info["frozen_balance_for_energy"]} BW: #{balance_info["frozen_balance_for_bandwidth"]}). Votes: #{balance_info["votes"]}")
       contracts = @wallet.db.get_contracts
       contracts.each do |name, contract|
         @wallet.prompt.say("#{name}: #{@wallet.node.get_token_balance(address, contract)}")
