@@ -33,15 +33,24 @@ module Wallet
 
 
       frozen_balance_for_bandwidth = 0
-      body["frozen"].as_a.each do |f|
-        frozen_balance_for_bandwidth += read_money(f, "frozen_balance")
+      if body["frozen"]?
+        body["frozen"].as_a.each do |f|
+          frozen_balance_for_bandwidth += read_money(f, "frozen_balance")
+        end
       end
 
-      frozen_balance_for_energy = read_money(body["account_resource"]["frozen_balance_for_energy"], "frozen_balance")
 
+      frozen_balance_for_energy = if body["account_resource"]?
+        read_money(body["account_resource"], "frozen_balance_for_energy")
+      else
+        0
+      end
+      
       votes_sum = 0
-      body["votes"].as_a.each do |v|
-        votes_sum += read_int(v, "vote_count")
+      if body["votes"]?
+        body["votes"].as_a.each do |v|
+          votes_sum += read_money(v, "vote_count")
+        end
       end
 
       balance = read_money(body, "balance")
