@@ -310,7 +310,7 @@ module Wallet
     end
 
     def wallet_send_trx(to_address : String)
-      @wallet.prompt.say("Balance: #{@wallet.node.get_balance(@wallet.address)}")
+      @wallet.prompt.say("Balance: #{@wallet.node.get_balance(@wallet.address)["balance"]}")
       amount = @wallet.prompt.ask("Enter amount:", required: true).not_nil!
       password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
       account = @wallet.account
