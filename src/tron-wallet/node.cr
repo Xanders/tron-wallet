@@ -15,12 +15,44 @@ module Wallet
       return JSON.parse(res.body)
     end
 
+    def read_int(json : JSON::Any, field_name : String?)
+      if field_name.nil?
+        return json ? json.as_i64 : 0_i64
+      else
+        return json[field_name]? ? json[field_name].as_i64 : 0_i64
+      end
+    end
+
+    def read_money(json : JSON::Any, field_name : String?)
+      return read_int(json, field_name) / 1000000
+    end
+
     def get_balance(address)
       res = @conn.post("/wallet/getaccount", body: {"address" => address, "visible" => true}.to_json)
       body = JSON.parse(res.body)
 
-      balance = body["balance"]? ? JSON.parse(res.body)["balance"].as_i64 : 0_i64
-      return balance / 1000000
+
+      frozen_balance_for_bandwidth = 0
+      body["frozen"].as_a.each do |f|
+        frozen_balance_for_bandwidth += read_money(f, "frozen_balance")
+      end
+
+      frozen_balance_for_energy = read_money(body["account_resource"]["frozen_balance_for_energy"], "frozen_balance")
+
+      votes_sum = 0
+      body["votes"].as_a.each do |v|
+        votes_sum += read_int(v, "vote_count")
+      end
+
+      balance = read_money(body, "balance")
+      # balance = body["balance"]? ? JSON.parse(res.body)["balance"].as_i64 : 0_i64
+      return {
+        "balance" => balance,
+        "frozen" => frozen_balance_for_bandwidth + frozen_balance_for_energy,
+        "frozen_balance_for_energy" => frozen_balance_for_energy,
+        "frozen_balance_for_bandwidth" => frozen_balance_for_bandwidth,
+        "votes" => votes_sum
+      }
     end
 
     def get_net_stats(address)
@@ -38,6 +70,14 @@ module Wallet
         "energy" => energy
       }
     end
+
+    def get_unclaimed_rewards(address)
+      res = @conn.post("/wallet/getReward", body: {"address" => address, "visible" => true}.to_json)
+      body = JSON.parse(res.body)
+      reward = body["reward"]? ? body["reward"].as_i64 : 0_i64
+      return reward / 1000000
+    end
+
 
     def get_token_balance(address, contract)
       params = Wallet::Utils.tron_params(TronAddress.to_hex(address.not_nil!))
@@ -84,6 +124,20 @@ module Wallet
         return "OK", "", transaction_id
       else
         return "FAILED", body["result"].to_json, transaction_id
+      end
+    end
+
+    def claim_rewards(address : String, private_key : String)
+      transaction = @conn.post("/wallet/withdrawbalance", body: {
+        "owner_address" => address,
+        "visible" => true
+      }.to_json)
+      signed = sign_transaction(JSON.parse(transaction.body), private_key)
+      sended = send_transaction(signed)
+      if sended["result"]? && sended["result"].as_bool == true
+        return "OK", "", sended["txid"].as_s
+      else
+        return "FAILED", sended.to_json, sended["txid"].as_s
       end
     end
 

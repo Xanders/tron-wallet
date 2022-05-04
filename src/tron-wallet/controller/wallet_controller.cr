@@ -4,10 +4,10 @@ module Wallet
       command = if args.any?
         args.shift
       else
-        @wallet.prompt.select("Select command", %w(login logout list create import delete address backup balance send)).not_nil!
+        @wallet.prompt.select("Select command", %w(login logout list create import delete address backup balance send claim)).not_nil!
       end
 
-      generate_case("wallet", %w(login logout list create import delete address backup balance send))
+      generate_case("wallet", %w(login logout list create import delete address backup balance send claim))
     end
 
     def wallet_login(args)
@@ -229,13 +229,46 @@ module Wallet
 
       stats = @wallet.node.get_net_stats(address)
       @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]} Energy: #{stats["energy"]}")
-      @wallet.prompt.say("TRX: #{@wallet.node.get_balance(address)}")
+      reward = @wallet.node.get_unclaimed_rewards(address)
+      if reward > 0
+        @wallet.prompt.say("Unclaimed rewards: #{reward} TRX")
+      end
+
+      # @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]} Energy: #{stats["energy"]}")
+      balance_info = @wallet.node.get_balance(address)
+    
+      @wallet.prompt.say("TRX: #{balance_info["balance"]}. Frozen: #{balance_info["frozen"]} (E: #{balance_info["frozen_balance_for_energy"]} BW: #{balance_info["frozen_balance_for_bandwidth"]}) Votes: #{balance_info["votes"]}")
       contracts = @wallet.db.get_contracts
       contracts.each do |name, contract|
         @wallet.prompt.say("#{name}: #{@wallet.node.get_token_balance(address, contract)}")
       end
     rescue OpenSSL::Cipher::Error
       @wallet.prompt.error("Invalid password!")
+    end
+
+    
+    
+    def wallet_claim(args)
+      return unless connected?
+      return unless authorized?
+
+      account = @wallet.account
+      data = @wallet.db.get_account(account)
+
+      unless data.any?
+        @wallet.prompt.error("No data for account `#{account}`")
+        return
+      end
+
+      encrypted = data[account]
+      begin
+        password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
+        decrypted_data = @wallet.db.decrypt(encrypted, password)
+        private_key = decrypted_data["key"]
+        @wallet.node.claim_rewards(@wallet.address.not_nil!, private_key)
+      rescue OpenSSL::Cipher::Error
+        @wallet.prompt.error("Invalid password!")
+      end
     end
 
     def wallet_send(args)
@@ -312,6 +345,7 @@ module Wallet
         @wallet.prompt.error("Invalid password!")
       end
     end
+
 
     def wallet_send_token(to_address : String, coin : String, contracts : Hash(String, String))
       contract = contracts[coin]
