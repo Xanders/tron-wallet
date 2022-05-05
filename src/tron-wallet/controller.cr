@@ -3,6 +3,9 @@ macro generate_case(namespace, list)
   {% for value in list %}
   when {{value}} then {{namespace.id}}_{{value.id}}(args)
   {% end %}
+  {% if list.includes? "list" %}
+  when "ls" then {{namespace.id}}_list(args)
+  {% end %}
   else @wallet.prompt.error("Command not found")
   end
 end
@@ -16,7 +19,7 @@ macro initialize_commands(list)
     when {{value}} then {{value.id}}(args)
     {% end %}
     else
-      generate_case("wallet", %w(login logout list create import delete address backup balance send rename))
+      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake claim rename change_password))
     end
   ensure
     @wallet.prompt.say("\n")

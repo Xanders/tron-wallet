@@ -61,6 +61,8 @@ module Wallet
       else
         @wallet.prompt.warn("Contract not found")
       end
+    rescue Wallet::Node::RequestError
+      # OK, it is safe
     end
 
     def contracts_delete(args)

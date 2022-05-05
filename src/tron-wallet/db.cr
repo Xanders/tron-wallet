@@ -96,6 +96,10 @@ module Wallet
       @conn.exec("INSERT INTO accounts VALUES (?, ?)", args: [name, data])
     end
 
+    def update_account(name, data)
+      @conn.exec("UPDATE accounts SET value = ? WHERE name = ?", args: [data, name])
+    end
+
     def delete_account(name)
       @conn.exec("DELETE FROM accounts WHERE name = ?", args: [name])
     end
