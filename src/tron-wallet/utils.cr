@@ -7,9 +7,7 @@ module Wallet
     end
 
     def tron_params(*values : String) : String
-      string = ""
-      values.each {|value| string += prepend_zeroes(64, value)}
-      return string
+      values.map { |value| prepend_zeroes(64, value) }.join
     end
   end
 end

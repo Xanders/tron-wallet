@@ -12,11 +12,14 @@ module Wallet
     import (*account_name (*address)): import account
     delete: delete current account
     address (*account_name): show account address
+    history (*account_name): provide a link to transactions history
     backup (*account_name): show account address & private key
     balance (*account_name): show account balance
     send: send TRX or TRC20 token
-    rename (*old_name (*new_name)): change account name
+    stake: stake TRX to gain energy or bandwidth
     claim: claim TRX for voting rewards
+    rename (*old_name (*new_name)): change account name
+    change_password (*account_name): change account password
 
 • contracts: list contracts commands
     list: list available contracts
@@ -35,6 +38,7 @@ module Wallet
 • connect (*node_url): try to connect to the node
 • block: print current block number
 • help: print all supported commands
+• exit: shutdown the REPL
 
 
 ")
@@ -64,6 +68,8 @@ module Wallet
       number = res.dig("block_header", "raw_data", "number").as_i64
       @wallet.prompt.say("Number: #{number}")
       @wallet.prompt.say("ID: #{id}")
+    rescue Wallet::Node::RequestError
+      # OK, it is safe
     end
   end
 end

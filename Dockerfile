@@ -6,7 +6,9 @@ RUN apk add readline-dev readline-static \
 
 WORKDIR /project
 COPY . .
-RUN crystal build --release --static src/tron-wallet.cr
+RUN crystal spec \
+ && echo "Building app..." \
+ && crystal build --release --static src/tron-wallet.cr
 
 ENV HOME=/home
 ENTRYPOINT ["/project/tron-wallet"]

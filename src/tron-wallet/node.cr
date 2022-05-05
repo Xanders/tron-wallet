@@ -4,6 +4,9 @@ module Wallet
     @wallet : Wallet::Main
     @conn : HTTP::Client
 
+    class RequestError < RuntimeError
+    end
+
     def initialize(@wallet)
       uri = URI.parse @wallet.settings["node_url"]
       @conn = HTTP::Client.new uri
@@ -11,50 +14,46 @@ module Wallet
     end
 
     def generate_address
-      res = @conn.get("/wallet/generateaddress")
-      return JSON.parse(res.body)
+      get("/wallet/generateaddress")
     end
 
-    def read_int(json : JSON::Any, field_name : String?)
-      if field_name.nil?
-        return json ? json.as_i64 : 0_i64
-      else
-        return json[field_name]? ? json[field_name].as_i64 : 0_i64
-      end
+    def read_int(json : JSON::Any?)
+      json.nil? ? 0_i64 : json.as_i64
     end
 
-    def read_money(json : JSON::Any, field_name : String?)
-      return read_int(json, field_name) / 1000000
+    def read_int(json : JSON::Any, *field_names)
+      read_int(json.dig?(*field_names))
     end
 
-    def get_balance(address)
-      res = @conn.post("/wallet/getaccount", body: {"address" => address, "visible" => true}.to_json)
-      body = JSON.parse(res.body)
+    def read_money(json : JSON::Any?)
+      read_int(json) / 1000000
+    end
 
+    def read_money(json : JSON::Any, *field_names)
+      read_money(json.dig?(*field_names))
+    end
 
-      frozen_balance_for_bandwidth = 0
-      if body["frozen"]?
-        body["frozen"].as_a.each do |f|
+    def get_trx_balance(address)
+      result = post("/wallet/getaccount", {"address" => address, "visible" => true})
+
+      frozen_balance_for_bandwidth = 0.0
+      if result["frozen"]?
+        result["frozen"].as_a.each do |f|
           frozen_balance_for_bandwidth += read_money(f, "frozen_balance")
         end
       end
 
+      frozen_balance_for_energy = read_money(result, "account_resource", "frozen_balance_for_energy", "frozen_balance")
 
-      frozen_balance_for_energy = if body["account_resource"]?
-        read_money(body["account_resource"], "frozen_balance_for_energy")
-      else
-        0
-      end
-      
-      votes_sum = 0
-      if body["votes"]?
-        body["votes"].as_a.each do |v|
+      votes_sum = 0.0
+      if result["votes"]?
+        result["votes"].as_a.each do |v|
           votes_sum += read_money(v, "vote_count")
         end
       end
 
-      balance = read_money(body, "balance")
-      # balance = body["balance"]? ? JSON.parse(res.body)["balance"].as_i64 : 0_i64
+      balance = read_money(result, "balance")
+
       return {
         "balance" => balance,
         "frozen" => frozen_balance_for_bandwidth + frozen_balance_for_energy,
@@ -64,174 +63,195 @@ module Wallet
       }
     end
 
-    def get_net_stats(address)
-      res = @conn.post("/wallet/getaccountresource", body: {"address" => address, "visible" => true}.to_json)
-
-      # @wallet.prompt.warn(JSON.parse(res.body))
-
-      body = JSON.parse(res.body)
-      limit = body["freeNetLimit"]? ? body["freeNetLimit"].as_i64 : 0_i64
-      used = body["freeNetUsed"]? ? body["freeNetUsed"].as_i64 : 0_i64
-      energy = body["EnergyLimit"]? ? body["EnergyLimit"].as_i64 : 0_i64
-      return {
-        "bandwidth_free" => limit - used,
-        "bandwidth_limit" => limit,
-        "energy" => energy
-      }
-    end
-
-    def get_unclaimed_rewards(address)
-      res = @conn.post("/wallet/getReward", body: {"address" => address, "visible" => true}.to_json)
-      body = JSON.parse(res.body)
-      reward = body["reward"]? ? body["reward"].as_i64 : 0_i64
-      return reward / 1000000
-    end
-
-
     def get_token_balance(address, contract)
       params = Wallet::Utils.tron_params(TronAddress.to_hex(address.not_nil!))
-      res = @conn.post("/wallet/triggerconstantcontract", body: {
+      result = post("/wallet/triggerconstantcontract", {
         "contract_address" => contract,
         "function_selector" => "balanceOf(address)",
         "parameter" => params,
         "owner_address" => address,
         "visible" => true
-      }.to_json)
+      })
 
-      body = JSON.parse(res.body)
-      balance = body["constant_result"]? ? body["constant_result"].as_a.first.as_s.to_i64(16) : 0_i64
-      return balance / 1000000
+      result["constant_result"]? ? result["constant_result"].as_a.first.as_s.to_i64(16) / 1000000 : 0_i64
+    end
+
+    def get_net_stats(address)
+      result = post("/wallet/getaccountresource", {"address" => address, "visible" => true})
+
+      limit = read_int(result, "freeNetLimit")
+      used = read_int(result, "freeNetUsed")
+      energy = read_int(result, "EnergyLimit")
+
+      return {
+        "bandwidth_free" => limit - used,
+        "bandwidth_limit" => limit,
+        "energy" => energy,
+        "visible" => true
+      }
+    end
+
+    def get_unclaimed_rewards(address)
+      result = post("/wallet/getReward", {"address" => address, "visible" => true})
+      return read_money(result, "reward")
     end
 
     def get_contract_name(address)
-      res = @conn.post("/wallet/triggerconstantcontract", body: {
+      result = post("/wallet/triggerconstantcontract", {
         "owner_address" => "TQQg4EL8o1BSeKJY4MJ8TB8XK7xufxFBvK", # hardcode for unautorized call
         "contract_address" => address,
         "function_selector" => "name()",
         "visible" => true
-      }.to_json)
+      })
 
-      body = JSON.parse(res.body)
-      name = body["constant_result"]? ? String.new(body["constant_result"].as_a.first.as_s.hexbytes).delete('\n') : nil
-
-      return name
+      result["constant_result"]? ? String.new(result["constant_result"].as_a.first.as_s.hexbytes).delete('\n') : nil
     end
 
-    def transfer(address : String, private_key : String, amount : Float64)
+    def transfer_trx(address : String, private_key : String, amount : Float64)
       amount = (amount * 1000000).to_i64
-      res = @conn.post("/wallet/easytransferbyprivate", body: {
-        "visible" => true,
+      result = post("/wallet/easytransferbyprivate", {
         "toAddress" => address,
         "privateKey" => private_key,
-        "amount" => amount
-      }.to_json)
+        "amount" => amount,
+        "visible" => true
+      })
 
-      body = JSON.parse(res.body)
-      transaction_id = body["transaction"]? ? body["transaction"]["txID"].as_s : ""
+      transaction_id = result["transaction"]? ? result["transaction"]["txID"].as_s : ""
 
-      if body["result"]["result"]? && body["result"]["result"].as_bool? == true
+      if result["result"]["result"]? && result["result"]["result"].as_bool? == true
         return "OK", "", transaction_id
       else
-        return "FAILED", body["result"].to_json, transaction_id
-      end
-    end
-
-    def claim_rewards(address : String, private_key : String)
-      transaction = @conn.post("/wallet/withdrawbalance", body: {
-        "owner_address" => address,
-        "visible" => true
-      }.to_json)
-      signed = sign_transaction(JSON.parse(transaction.body), private_key)
-      sended = send_transaction(signed)
-      if sended["result"]? && sended["result"].as_bool == true
-        return "OK", "", sended["txid"].as_s
-      else
-        return "FAILED", sended.to_json, sended["txid"].as_s
+        return "FAILED", result["result"].to_json, transaction_id
       end
     end
 
     def transfer_token(address : String, private_key : String, contract : String, amount : Float64)
       amount = (amount * 1000000).to_i64
-      transaction = create_trc20_transaction(from: @wallet.address.not_nil!, to: address, contract: contract, amount: amount)
+      parameter = Wallet::Utils.tron_params(TronAddress.to_hex(address), amount.to_s(16))
 
-      transaction_id = transaction["transaction"]? ? transaction["transaction"]["txID"].as_s : ""
-
-      if !transaction["transaction"]?
-        return "FAILED", transaction["result"]["message"].as_s, transaction_id
-      elsif transaction["transaction"]["ret"].as_a.first.as_h.any?
-        return "FAILED", transaction["result"]["message"].as_s, transaction_id
-      else
-        signed = sign_transaction(transaction["transaction"], private_key)
-        sended = send_transaction(signed)
-        if sended["result"]? && sended["result"].as_bool == true
-          return "OK", "", sended["txid"].as_s
-        else
-          return "FAILED", sended.to_json, sended["txid"].as_s
-        end
-      end
-    end
-
-    def create_trc20_transaction(from : String, to : String,  contract : String, amount : Int64)
-      params = Wallet::Utils.tron_params(TronAddress.to_hex(to), amount.to_s(16))
-
-      body = {
+      make_transaction("/wallet/triggerconstantcontract", {
         "contract_address" => contract,
         "function_selector" => "transfer(address,uint256)",
-        "parameter" => params,
-        "owner_address" => from,
+        "parameter" => parameter,
+        "owner_address" => @wallet.address.not_nil!,
         "fee_limit" => @wallet.settings["max_commission"].to_i64 * 1000000,
         "call_value" => 0,
         "visible" => true
-      }
-
-      res = @conn.post("/wallet/triggerconstantcontract", body: body.to_json)
-      return JSON.parse(res.body)
+      }, private_key)
     end
 
-    def create_transaction(from : String, to : String, amount : Int64)
-      res = @conn.post("/wallet/createtransaction", body: {
-        "to_address" => TronAddress.to_hex(to),
-        "owner_address" => TronAddress.to_hex(from),
-        "amount" => amount
-      }.to_json)
+    def stake(address : String, amount : Float64, duration : Int32, resource : String, receiver : String?, private_key : String)
+      amount = (amount * 1000000).to_i64
 
-      return JSON.parse(res.body)
+      make_transaction("/wallet/freezebalance", {
+        "owner_address" => address,
+        "frozen_balance" => amount,
+        "frozen_duration" => duration,
+        "resource" => resource,
+        "receiver_address" => receiver == address ? nil : receiver,
+        "visible" => true
+      }, private_key, scoped: false)
     end
 
-    def sign_transaction(transaction : JSON::Any, private_key : String)
-      body = {
-        "transaction" => transaction,
-        "privateKey" => private_key,
-      }.to_json
-
-      res = @conn.post("/wallet/gettransactionsign", body: body)
-
-      return JSON.parse(res.body)
-    end
-
-    def send_transaction(transaction : JSON::Any)
-      res = @conn.post("/wallet/broadcasttransaction", body: transaction.to_json)
-
-      return JSON.parse(res.body)
+    def claim_rewards(address : String, private_key : String)
+      make_transaction("/wallet/withdrawbalance", {
+        "owner_address" => address,
+        "visible" => true
+      }, private_key)
     end
 
     def get_now_block
-      res = @conn.get("/wallet/getnowblock")
+      get("/wallet/getnowblock")
+    end
 
-      return JSON.parse(res.body)
+    def make_transaction(path, params, private_key, scoped = true)
+      transaction = post(path, params)
+
+      if scoped
+        if transaction["transaction"]?.nil?
+          return "FAILED", transaction.to_json, nil
+        end
+        transaction = transaction["transaction"]
+      end
+
+      if transaction["txID"]?.nil?
+        return "FAILED", transaction.to_json, nil
+      end
+
+      id = transaction["txID"].as_s
+
+      if transaction["ret"]? && transaction["ret"].as_a.first.as_h.any?
+        return "FAILED", transaction["result"]["message"].as_s, id
+      end
+
+      signed = sign_transaction(transaction, private_key)
+      sended = send_transaction(signed)
+
+      id = sended["txid"].as_s
+
+      if sended["result"]? && sended["result"].as_bool == true
+        return "OK", "", id
+      else
+        return "FAILED", sended.to_json, id
+      end
+    end
+
+    def sign_transaction(transaction : JSON::Any, private_key : String)
+      post("/wallet/gettransactionsign", {
+        "transaction" => transaction,
+        "privateKey" => private_key,
+      })
+    end
+
+    def send_transaction(transaction : JSON::Any)
+      post("/wallet/broadcasttransaction", transaction)
     end
 
     def status
       @conn.get("/")
       @wallet.connected = true
     rescue error
-      @wallet.prompt.error("Cannot connect to #{@wallet.settings["node_url"]} (#{error.message})")
-      @wallet.connected = false
+      disconnect_with_warning(error)
     end
 
     def reconnect
       uri = URI.parse @wallet.settings["node_url"]
       @conn = HTTP::Client.new uri
+    end
+
+    def get(path)
+      response = begin
+        @conn.get(path)
+      rescue error
+        error_while_request(error)
+      end
+
+      JSON.parse(response.body)
+    end
+
+    def post(path, params)
+      body = params.to_json
+
+      response = begin
+        @conn.post(path, body: body)
+      rescue error
+        error_while_request(error)
+      end
+
+      JSON.parse(response.body)
+    end
+
+    def error_while_request(error)
+      disconnect_with_warning(error)
+      raise RequestError.new
+    end
+
+    def disconnect_with_warning(error)
+      @wallet.prompt.error("Cannot connect to #{@wallet.settings["node_url"]} (#{error.message})")
+      @wallet.prompt.error("\nUse `connect` command to restore connection or")
+      @wallet.prompt.error("to try another node from the list (ctrl+click):")
+      @wallet.prompt.error("\nhttps://tronprotocol.github.io/documentation-en/developers/official-public-nodes/")
+      @wallet.connected = false
     end
   end
 end
