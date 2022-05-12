@@ -325,7 +325,7 @@ module Wallet
       @wallet.prompt.say("Balance: #{@wallet.node.get_trx_balance(@wallet.address)["balance"]}")
       amount = @wallet.prompt.ask("Enter amount:", required: true).not_nil!.to_f64
       private_key = get_logged_account_key
-      duration = @wallet.prompt.ask("Enter duration in days (minimum 3):", default: '3', required: true).not_nil!.to_i32
+      duration = @wallet.prompt.ask("Enter duration in days (minimum 3):", default: "3", required: true).not_nil!.to_i32
       resource = @wallet.prompt.select("Which resource you want to gain?", ["ENERGY", "BANDWIDTH"]).not_nil!
       receiver = case @wallet.prompt.select("Which account will recieve the resource?", ["This account", "Another account in the wallet", "Account from addressbook", "Enter address"])
       when "This account"
