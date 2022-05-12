@@ -79,8 +79,8 @@ module Wallet
     def get_net_stats(address)
       result = post("/wallet/getaccountresource", {"address" => address, "visible" => true})
 
-      limit = read_int(result, "freeNetLimit")
-      used = read_int(result, "freeNetUsed")
+      limit = read_int(result, "freeNetLimit") + read_int(result, "NetLimit")
+      used = read_int(result, "freeNetUsed") + read_int(result, "NetUsed")
       energy = read_int(result, "EnergyLimit")
 
       return {
