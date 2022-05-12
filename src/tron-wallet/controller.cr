@@ -19,7 +19,7 @@ macro initialize_commands(list)
     when {{value}} then {{value.id}}(args)
     {% end %}
     else
-      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake claim rename change_password))
+      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake unstake claim rename change_password))
     end
   ensure
     @wallet.prompt.say("\n")
@@ -35,9 +35,10 @@ module Wallet
     include BookController
     include SettingsController
     include ServiceController
+    include WitnessController
 
     @wallet : Wallet::Main
-    initialize_commands(%w(wallet contracts book settings connect block help))
+    initialize_commands(%w(wallet contracts book witness settings connect block help))
     def initialize(@wallet); end
 
     def initial_setup

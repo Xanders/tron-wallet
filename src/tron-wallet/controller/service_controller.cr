@@ -17,6 +17,7 @@ module Wallet
     balance (*account_name): show account balance
     send: send TRX or TRC20 token
     stake: stake TRX to gain energy or bandwidth
+    unstake: release the TRX stake after it's duration
     claim: claim TRX for voting rewards
     rename (*old_name (*new_name)): change account name
     change_password (*account_name): change account password
@@ -30,6 +31,10 @@ module Wallet
     list: list available book addresses
     create: add new record to addressbook
     delete: delete addressbook record
+
+• witness: list witness commands
+    list: list actual witnesses
+    vote: vote for a witness with Tron Power gained by staking
 
 • settings: list settings commands
     show: show application settings
@@ -50,6 +55,7 @@ module Wallet
       if args.any?
         new_node_url = args.shift
         @wallet.db.update_settings(node_url: new_node_url)
+        @wallet.settings = @wallet.db.get_settings
         @wallet.prompt.warn("Node URL was changed in settings from #{current_node_url} to #{new_node_url}")
         current_node_url = new_node_url
         @wallet.node.reconnect

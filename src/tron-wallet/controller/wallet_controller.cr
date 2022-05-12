@@ -4,10 +4,10 @@ module Wallet
       command = if args.any?
         args.shift
       else
-        @wallet.prompt.select("Select command", %w(login logout list create import delete address history backup balance send stake claim rename change_password)).not_nil!
+        @wallet.prompt.select("Select command", %w(login logout list create import delete address history backup balance send stake unstake claim rename change_password)).not_nil!
       end
 
-      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake claim rename change_password))
+      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake unstake claim rename change_password))
     end
 
     def wallet_login(args)
@@ -245,7 +245,7 @@ module Wallet
       end
 
       balance_info = @wallet.node.get_trx_balance(address)
-      @wallet.prompt.say("TRX: #{balance_info["balance"]}. Frozen: #{balance_info["frozen"]} (E: #{balance_info["frozen_balance_for_energy"]}, BW: #{balance_info["frozen_balance_for_bandwidth"]}). Votes: #{balance_info["votes"]}")
+      @wallet.prompt.say("TRX: #{balance_info["balance"]}. Staked: #{balance_info["frozen"]} (E: #{balance_info["frozen_balance_for_energy"]}, BW: #{balance_info["frozen_balance_for_bandwidth"]}). Votes used: #{balance_info["votes_used"]}/#{balance_info["tron_power"]}")
 
       contracts = @wallet.db.get_contracts
       contracts.each do |name, contract|
@@ -321,10 +321,11 @@ module Wallet
     def wallet_stake(args)
       return unless connected?
       return unless authorized?
+
       @wallet.prompt.say("Balance: #{@wallet.node.get_trx_balance(@wallet.address)["balance"]}")
       amount = @wallet.prompt.ask("Enter amount:", required: true).not_nil!.to_f64
       private_key = get_logged_account_key
-      duration = @wallet.prompt.ask("Enter duration in days (minimum 3):", required: true).not_nil!.to_i32
+      duration = @wallet.prompt.ask("Enter duration in days (minimum 3):", default: '3', required: true).not_nil!.to_i32
       resource = @wallet.prompt.select("Which resource you want to gain?", ["ENERGY", "BANDWIDTH"]).not_nil!
       receiver = case @wallet.prompt.select("Which account will recieve the resource?", ["This account", "Another account in the wallet", "Account from addressbook", "Enter address"])
       when "This account"
@@ -356,6 +357,82 @@ module Wallet
         receiver: receiver,
         private_key: private_key
       ))
+
+      want_to_vote = @wallet.prompt.yes?("Do you want to vote for random SR-node with all staked TRX for additional rewards?")
+      if want_to_vote
+        tron_power = @wallet.node.get_trx_balance(@wallet.address.not_nil!)["tron_power"].as(Int32)
+        witness = WitnessController.top(@wallet.node).sample["address"]
+
+        show_transaction_result(*@wallet.node.vote_for_witness(
+          address: @wallet.address.not_nil!,
+          witness: witness,
+          votes: tron_power,
+          private_key: private_key
+        ))
+      end
+    rescue OpenSSL::Cipher::Error
+      @wallet.prompt.error("Invalid password!")
+    rescue Wallet::Node::RequestError
+      @wallet.prompt.error("\nDANGER: Result is unpredictable, double check your state before continue!")
+    end
+
+    def wallet_unstake(args)
+      return unless connected?
+      return unless authorized?
+
+      balance_info = @wallet.node.get_trx_balance(@wallet.address)
+      resources = case {balance_info["frozen_balance_for_energy"], balance_info["frozen_balance_for_bandwidth"]}
+      when {.zero?, .zero?}
+        @wallet.prompt.warn("There is no staked TRX on #{@wallet.account} account!")
+        return
+      when {.zero?, _}
+        @wallet.prompt.say("Staked TRX: #{balance_info["frozen_balance_for_bandwidth"]} for bandwidth")
+        ["BANDWIDTH"]
+      when {_, .zero?}
+        @wallet.prompt.say("Staked TRX: #{balance_info["frozen_balance_for_energy"]} for energy")
+        ["ENERGY"]
+      else
+        @wallet.prompt.say("Staked TRX: #{balance_info["frozen"]} total; for energy: #{balance_info["frozen_balance_for_energy"]}, for bandwidth: #{balance_info["frozen_balance_for_bandwidth"]}")
+        answer = @wallet.prompt.select("Which stake you want to release?", ["BOTH", "ENERGY", "BANDWIDTH"]).not_nil!
+        if answer == "BOTH"
+          ["ENERGY", "BANDWIDTH"]
+        else
+          [answer]
+        end
+      end
+
+      private_key = get_logged_account_key
+
+      receiver = case @wallet.prompt.select("Which account was used to gain the resource for stake?", ["This account", "Another account in the wallet", "Account from addressbook", "Enter address"])
+      when "This account"
+        @wallet.address
+      when "Another account in the wallet"
+        select_another_account_in_the_wallet
+      when "Account from addressbook"
+        select_account_from_the_book
+      when "Enter address"
+        @wallet.prompt.ask("Address", required: true)
+      end
+      return unless receiver
+
+      @wallet.prompt.warn("\nUNSTAKE INFO")
+      @wallet.prompt.say("Owner: #{@wallet.address} (#{@wallet.account})")
+      @wallet.prompt.say("Resource to release: #{resources.join ", "}")
+      @wallet.prompt.say("Source: #{receiver}")
+
+      confirm = @wallet.prompt.no?("Confirm?")
+      return unless confirm
+
+      resources.each do |resource|
+        @wallet.prompt.say("\nFor #{resource}:") if resources.size > 1
+
+        show_transaction_result(*@wallet.node.unstake(
+          address: @wallet.address.not_nil!,
+          resource: resource,
+          receiver: receiver,
+          private_key: private_key
+        ))
+      end
     rescue OpenSSL::Cipher::Error
       @wallet.prompt.error("Invalid password!")
     rescue Wallet::Node::RequestError

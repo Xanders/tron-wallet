@@ -8,9 +8,7 @@ module Wallet
     end
 
     def initialize(@wallet)
-      uri = URI.parse @wallet.settings["node_url"]
-      @conn = HTTP::Client.new uri
-      @conn.connect_timeout = 5
+      @conn = make_connection
     end
 
     def generate_address
@@ -45,6 +43,9 @@ module Wallet
 
       frozen_balance_for_energy = read_money(result, "account_resource", "frozen_balance_for_energy", "frozen_balance")
 
+      frozen = frozen_balance_for_bandwidth + frozen_balance_for_energy
+      tron_power = frozen.to_i32
+
       votes_sum = 0
       if result["votes"]?
         result["votes"].as_a.each do |v|
@@ -56,10 +57,11 @@ module Wallet
 
       return {
         "balance" => balance,
-        "frozen" => frozen_balance_for_bandwidth + frozen_balance_for_energy,
+        "frozen" => frozen,
         "frozen_balance_for_energy" => frozen_balance_for_energy,
         "frozen_balance_for_bandwidth" => frozen_balance_for_bandwidth,
-        "votes" => votes_sum
+        "votes_used" => votes_sum,
+        "tron_power" => tron_power
       }
     end
 
@@ -153,9 +155,39 @@ module Wallet
       }, private_key, scoped: false)
     end
 
+    def unstake(address : String, resource : String, receiver : String?, private_key : String)
+      make_transaction("/wallet/unfreezebalance", {
+        "owner_address" => address,
+        "resource" => resource,
+        "receiver_address" => receiver == address ? nil : receiver,
+        "visible" => true
+      }, private_key, scoped: false)
+    end
+
     def claim_rewards(address : String, private_key : String)
       make_transaction("/wallet/withdrawbalance", {
         "owner_address" => address,
+        "visible" => true
+      }, private_key, scoped: false)
+    end
+
+    def get_witnesses_list
+      get("/wallet/listwitnesses")
+    end
+
+    def vote_for_witness(address : String, witness : String, votes : Int32, private_key : String)
+      if witness.starts_with? TronAddress::FIRST_BYTE
+        witness = TronAddress.to_base58(witness)
+      end
+
+      make_transaction("/wallet/votewitnessaccount", {
+        "owner_address" => address,
+        "votes" => [
+          {
+            "vote_address" => witness,
+            "vote_count" => votes
+          }
+        ],
         "visible" => true
       }, private_key, scoped: false)
     end
@@ -215,8 +247,23 @@ module Wallet
     end
 
     def reconnect
-      uri = URI.parse @wallet.settings["node_url"]
-      @conn = HTTP::Client.new uri
+      @conn = make_connection
+    end
+
+    def make_connection
+      url = @wallet.settings["node_url"]
+
+      unless url.starts_with? /https?:\/\//
+        url = if url =~ /^\d+\.\d+\.\d+\.\d+(?::\d+)?$/
+          "http://#{url}"
+        else
+          "https://#{url}"
+        end
+      end
+
+      connection = HTTP::Client.new URI.parse url
+      connection.connect_timeout = 5
+      return connection
     end
 
     def get(path)
@@ -248,9 +295,11 @@ module Wallet
 
     def disconnect_with_warning(error)
       @wallet.prompt.error("Cannot connect to #{@wallet.settings["node_url"]} (#{error.message})")
-      @wallet.prompt.error("\nUse `connect` command to restore connection or")
-      @wallet.prompt.error("to try another node from the list (ctrl+click):")
-      @wallet.prompt.error("\nhttps://tronprotocol.github.io/documentation-en/developers/official-public-nodes/")
+      @wallet.prompt.warn("\nUse `connect` command to restore connection or")
+      @wallet.prompt.warn("to try another node from the list (ctrl+click):")
+      @wallet.prompt.warn("\nhttps://tronprotocol.github.io/documentation-en/developers/official-public-nodes/")
+      @wallet.prompt.warn("\nDo not forget the port, for example: `connect 3.225.171.164:8090`")
+      @wallet.prompt.warn("Scheme is optional (`http` for IP and `https` for domain by default")
       @wallet.connected = false
     end
   end
