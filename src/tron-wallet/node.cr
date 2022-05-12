@@ -157,7 +157,7 @@ module Wallet
       make_transaction("/wallet/withdrawbalance", {
         "owner_address" => address,
         "visible" => true
-      }, private_key)
+      }, private_key, scoped: false)
     end
 
     def get_now_block
