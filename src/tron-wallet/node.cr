@@ -45,10 +45,10 @@ module Wallet
 
       frozen_balance_for_energy = read_money(result, "account_resource", "frozen_balance_for_energy", "frozen_balance")
 
-      votes_sum = 0.0
+      votes_sum = 0
       if result["votes"]?
         result["votes"].as_a.each do |v|
-          votes_sum += read_money(v, "vote_count")
+          votes_sum += read_int(v, "vote_count")
         end
       end
 
