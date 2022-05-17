@@ -299,7 +299,7 @@ module Wallet
       @wallet.prompt.warn("to try another node from the list (ctrl+click):")
       @wallet.prompt.warn("\nhttps://tronprotocol.github.io/documentation-en/developers/official-public-nodes/")
       @wallet.prompt.warn("\nDo not forget the port, for example: `connect 3.225.171.164:8090`")
-      @wallet.prompt.warn("Scheme is optional (`http` for IP and `https` for domain by default")
+      @wallet.prompt.warn("Scheme is optional (`http` for IP and `https` for domain by default)")
       @wallet.connected = false
     end
   end

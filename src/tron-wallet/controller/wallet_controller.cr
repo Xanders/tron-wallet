@@ -262,7 +262,7 @@ module Wallet
       return unless authorized?
       contracts = @wallet.db.get_contracts
 
-      address = case @wallet.prompt.select("Select method", ["Enter address", "Select from addressbook", "Select another account in the wallet"])
+      address = case @wallet.prompt.select("Select method:", ["Enter address", "Select from addressbook", "Select another account in the wallet"])
       when "Enter address"
         @wallet.prompt.ask("Address", required: true)
       when "Select from addressbook"
@@ -272,7 +272,7 @@ module Wallet
       end
       return unless address
 
-      coin = @wallet.prompt.select("Select coin", ["TRX"] + contracts.keys).not_nil!
+      coin = @wallet.prompt.select("Select coin:", ["TRX"] + contracts.keys).not_nil!
 
       coin == "TRX" ? wallet_send_trx(address.not_nil!) : wallet_send_token(address.not_nil!, coin, contracts)
     rescue OpenSSL::Cipher::Error
@@ -302,7 +302,7 @@ module Wallet
     def wallet_send_token(to_address : String, coin : String, contracts : Hash(String, String))
       contract = contracts[coin]
       @wallet.prompt.say("Balance: #{@wallet.node.get_token_balance(@wallet.address, contract)}")
-      amount = @wallet.prompt.ask("Enter amount", required: true).not_nil!.to_f64
+      amount = @wallet.prompt.ask("Enter amount:", required: true).not_nil!.to_f64
       private_key = get_logged_account_key
 
       @wallet.prompt.warn("\nTRANSACTION INFO")
