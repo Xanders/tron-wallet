@@ -81,14 +81,16 @@ module Wallet
     def get_net_stats(address)
       result = post("/wallet/getaccountresource", {"address" => address, "visible" => true})
 
-      limit = read_int(result, "freeNetLimit") + read_int(result, "NetLimit")
-      used = read_int(result, "freeNetUsed") + read_int(result, "NetUsed")
-      energy = read_int(result, "EnergyLimit")
+      net_limit = read_int(result, "freeNetLimit") + read_int(result, "NetLimit")
+      net_used = read_int(result, "freeNetUsed") + read_int(result, "NetUsed")
+      energy_limit = read_int(result, "EnergyLimit")
+      energy_used = read_int(result, "EnergyUsed")
 
       return {
-        "bandwidth_free" => limit - used,
-        "bandwidth_limit" => limit,
-        "energy" => energy,
+        "bandwidth_free" => net_limit - net_used,
+        "bandwidth_limit" => net_limit,
+        "energy_free" => energy_limit - energy_used,
+        "energy_limit" => energy_limit,
         "visible" => true
       }
     end
@@ -173,6 +175,12 @@ module Wallet
 
     def get_witnesses_list
       get("/wallet/listwitnesses")
+    end
+
+    def get_brokerage(address : String)
+      result = get("/wallet/getBrokerage", {"address" => address, "visible" => true})
+
+      return read_int(result, "brokerage")
     end
 
     def vote_for_witness(address : String, witness : String, votes : Int32, private_key : String)
@@ -266,9 +274,11 @@ module Wallet
       return connection
     end
 
-    def get(path)
+    def get(path, params = nil)
+      body = params.to_json if params
+
       response = begin
-        @conn.get(path)
+        @conn.get(path, body: body)
       rescue error
         error_while_request(error)
       end

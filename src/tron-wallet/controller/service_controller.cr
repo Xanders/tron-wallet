@@ -5,16 +5,16 @@ module Wallet
 • wallet: list wallet commands
     # all wallet commands linked to root namespace
     # you can send all commands below without `wallet`
-    login (*account_name): login into account
+    login (*account_name): login into account # `cd` is an alias
     logout: log out from account
-    list: list available accounts
+    list: list available accounts # `ls` is an alias, same as other `list` commands
     create (*account_name): create new account
     import (*account_name (*address)): import account
     delete: delete current account
     address (*account_name): show account address
     history (*account_name): provide a link to transactions history
     backup (*account_name): show account address & private key
-    balance (*account_name): show account balance
+    balance (*account_name): show account balance # `ps` is an alias
     send: send TRX or TRC20 token
     stake: stake TRX to gain energy or bandwidth
     unstake: release the TRX stake after it's duration
@@ -34,7 +34,9 @@ module Wallet
 
 • witness: list witness commands
     list: list actual witnesses
+    top: list SR (Super Representative) witnesses with brokerage sorted by voter profit descending
     vote: vote for a witness with Tron Power gained by staking
+    brokerage (*address): show witnesses brokerage
 
 • settings: list settings commands
     show: show application settings

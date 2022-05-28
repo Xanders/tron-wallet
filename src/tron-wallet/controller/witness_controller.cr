@@ -4,10 +4,10 @@ module Wallet
       command = if args.any?
         args.shift
       else
-        @wallet.prompt.select("Select command", %w(list vote)).not_nil!
+        @wallet.prompt.select("Select command", %w(list top vote brokerage)).not_nil!
       end
 
-      generate_case("witness", %w(list vote))
+      generate_case("witness", %w(list top vote brokerage))
     end
 
     def witness_list(args)
@@ -17,6 +17,19 @@ module Wallet
 
       WitnessController.list(@wallet.node).each do |witness|
         @wallet.prompt.say("#{witness["address"]} | #{witness["voteCount"].format('.', ' ')}\t| #{witness["url"].strip}")
+      end
+    end
+
+    def witness_top(args)
+      return unless connected?
+
+      @wallet.prompt.say("Loading brokerages...")
+      top = WitnessController.top(@wallet.node)
+
+      @wallet.prompt.say("\nAddress#{" " * 27} | Brokerage | Number of votes\t| URL or title")
+
+      top.each do |witness|
+        @wallet.prompt.say("#{witness["address"]} | #{witness["brokerage"].to_s.rjust(8)}% | #{witness["voteCount"].format('.', ' ')}\t| #{witness["url"].strip}")
       end
     end
 
@@ -31,10 +44,12 @@ module Wallet
         return
       end
 
+      @wallet.prompt.say("Loading brokerages to calculate your profit...")
       top = WitnessController.top(@wallet.node)
-      choices = top.map do |witness|
+      choices = top.map_with_index do |witness, index|
+        comment = index.zero? ? " (best one by your profit)" : ""
         {
-          name: "#{witness["url"]} (votes: #{witness["voteCount"].format('.', ' ')})",
+          name: witness["url"] + comment,
           value: witness["address"]
         }
       end
@@ -48,7 +63,7 @@ module Wallet
       })
 
       # Do not use `enum_select` since it's broken!
-      witness = @wallet.prompt.select("Select the witness (only SR nodes shown):", choices, default: choices.size, page_size: 30, required: true).not_nil!
+      witness = @wallet.prompt.select("Select the witness (only SR nodes shown, sorted by your profit descending):", choices, default: 1, page_size: 30, required: true).not_nil!
       case witness
       when "ADDRESS"
         witness = @wallet.prompt.ask("Enter address:", required: true).not_nil!
@@ -81,6 +96,20 @@ module Wallet
       @wallet.prompt.error("\nDANGER: Result is unpredictable, double check your state before continue!")
     end
 
+    def witness_brokerage(args)
+      return unless connected?
+
+      address = if args.any?
+        args.first
+      else
+        @wallet.prompt.ask("Enter witness address:", required: true).not_nil!
+      end
+
+      brokerage = @wallet.node.get_brokerage(address)
+
+      @wallet.prompt.say("Witness brokerage is #{brokerage}%")
+    end
+
     def self.list(node)
       node.get_witnesses_list["witnesses"].as_a.map do |element|
         {
@@ -92,7 +121,9 @@ module Wallet
     end
 
     def self.top(node)
-      list(node)[0...27]
+      list(node)[0...27].reverse.map do |witness|
+        witness.merge "brokerage": node.get_brokerage(witness["address"])
+      end.sort_by(&.[]("brokerage"))
     end
   end
 end

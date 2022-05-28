@@ -238,18 +238,18 @@ module Wallet
       end
 
       stats = @wallet.node.get_net_stats(address)
-      @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]}. Energy: #{stats["energy"]}")
+      @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]}. Energy: #{stats["energy_free"]}/#{stats["energy_limit"]}")
       reward = @wallet.node.get_unclaimed_rewards(address)
       if reward > 0
         @wallet.prompt.say("Unclaimed rewards: #{reward} TRX")
       end
 
       balance_info = @wallet.node.get_trx_balance(address)
-      @wallet.prompt.say("TRX: #{balance_info["balance"]}. Staked: #{balance_info["frozen"]} (E: #{balance_info["frozen_balance_for_energy"]}, BW: #{balance_info["frozen_balance_for_bandwidth"]}). Votes used: #{balance_info["votes_used"]}/#{balance_info["tron_power"]}")
+      @wallet.prompt.say("TRX: #{balance_info["balance"].format}. Staked: #{balance_info["frozen"]} (E: #{balance_info["frozen_balance_for_energy"]}, BW: #{balance_info["frozen_balance_for_bandwidth"]}). Votes used: #{balance_info["votes_used"]}/#{balance_info["tron_power"]}")
 
       contracts = @wallet.db.get_contracts
       contracts.each do |name, contract|
-        @wallet.prompt.say("#{name}: #{@wallet.node.get_token_balance(address, contract)}")
+        @wallet.prompt.say("#{name}: #{@wallet.node.get_token_balance(address, contract).format}")
       end
     rescue OpenSSL::Cipher::Error
       @wallet.prompt.error("Invalid password!")
@@ -282,7 +282,7 @@ module Wallet
     end
 
     def wallet_send_trx(to_address : String)
-      @wallet.prompt.say("Balance: #{@wallet.node.get_trx_balance(@wallet.address)["balance"]}")
+      @wallet.prompt.say("Balance: #{@wallet.node.get_trx_balance(@wallet.address)["balance"].format}")
       amount = @wallet.prompt.ask("Enter amount:", required: true).not_nil!.to_f64
       private_key = get_logged_account_key
 
@@ -301,7 +301,7 @@ module Wallet
 
     def wallet_send_token(to_address : String, coin : String, contracts : Hash(String, String))
       contract = contracts[coin]
-      @wallet.prompt.say("Balance: #{@wallet.node.get_token_balance(@wallet.address, contract)}")
+      @wallet.prompt.say("Balance: #{@wallet.node.get_token_balance(@wallet.address, contract).format}")
       amount = @wallet.prompt.ask("Enter amount:", required: true).not_nil!.to_f64
       private_key = get_logged_account_key
 
@@ -322,7 +322,7 @@ module Wallet
       return unless connected?
       return unless authorized?
 
-      @wallet.prompt.say("Balance: #{@wallet.node.get_trx_balance(@wallet.address)["balance"]}")
+      @wallet.prompt.say("Balance: #{@wallet.node.get_trx_balance(@wallet.address)["balance"].format}")
       amount = @wallet.prompt.ask("Enter amount:", required: true).not_nil!.to_f64
       private_key = get_logged_account_key
       duration = @wallet.prompt.ask("Enter duration in days (minimum 3):", default: "3", required: true).not_nil!.to_i32
@@ -358,10 +358,12 @@ module Wallet
         private_key: private_key
       ))
 
-      want_to_vote = @wallet.prompt.yes?("Do you want to vote for random SR-node with all staked TRX for additional rewards?")
+      want_to_vote = @wallet.prompt.yes?("Do you want to vote for best-by-your-profit SR-node with all staked TRX for additional rewards?")
       if want_to_vote
         tron_power = @wallet.node.get_trx_balance(@wallet.address.not_nil!)["tron_power"].as(Int32)
-        witness = WitnessController.top(@wallet.node).sample["address"]
+
+        @wallet.prompt.say("Loading brokerages to calculate your profit...")
+        witness = WitnessController.top(@wallet.node)[0]["address"]
 
         show_transaction_result(*@wallet.node.vote_for_witness(
           address: @wallet.address.not_nil!,

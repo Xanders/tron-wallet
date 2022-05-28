@@ -6,6 +6,12 @@ macro generate_case(namespace, list)
   {% if list.includes? "list" %}
   when "ls" then {{namespace.id}}_list(args)
   {% end %}
+  {% if list.includes? "login" %}
+  when "cd" then {{namespace.id}}_login(args)
+  {% end %}
+  {% if list.includes? "balance" %}
+  when "ps" then {{namespace.id}}_balance(args)
+  {% end %}
   else @wallet.prompt.error("Command not found")
   end
 end
