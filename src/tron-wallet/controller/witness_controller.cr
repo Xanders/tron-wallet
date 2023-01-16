@@ -115,7 +115,7 @@ module Wallet
         {
           "address": TronAddress.to_base58(element["address"].as_s),
           "url": element["url"].as_s,
-          "voteCount": element["voteCount"]? ? element["voteCount"].as_i : 0
+          "voteCount": element["voteCount"]? ? element["voteCount"].as_i64 : 0_i64
         }
       end.sort_by(&.[]("voteCount")).reverse
     end
