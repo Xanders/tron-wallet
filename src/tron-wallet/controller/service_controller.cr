@@ -74,8 +74,24 @@ module Wallet
       res = @wallet.node.get_now_block
       id = res["blockID"].as_s
       number = res.dig("block_header", "raw_data", "number").as_i64
-      @wallet.prompt.say("Number: #{number}")
       @wallet.prompt.say("ID: #{id}")
+      @wallet.prompt.say("Number: #{number}")
+
+      tronscan_block = @wallet.node.get_tronscan_block
+      if tronscan_block
+        @wallet.prompt.say("Number on Tronscan: #{tronscan_block}")
+
+        diff = (tronscan_block - number).abs
+        diff_message = "Diff is #{diff}"
+        if diff > Wallet::Node::MAXIMUM_GAP
+          @wallet.prompt.warn(diff_message)
+        else
+          @wallet.prompt.say(diff_message)
+        end
+      else
+        @wallet.prompt.warn("Cannot get current block from Tronscan!")
+        @wallet.prompt.warn("Check it manually at https://tronscan.org/ (ctrl+click)")
+      end
     rescue Wallet::Node::RequestError
       # OK, it is safe
     end

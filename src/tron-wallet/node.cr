@@ -1,10 +1,15 @@
 module Wallet
   class Node
+    MAXIMUM_GAP = 50
+
     getter conn
     @wallet : Wallet::Main
     @conn : HTTP::Client
 
     class RequestError < RuntimeError
+    end
+
+    class OutOfSync < RuntimeError
     end
 
     def initialize(@wallet)
@@ -248,10 +253,28 @@ module Wallet
     end
 
     def status
-      @conn.get("/")
+      node_block = get_now_block.dig("block_header", "raw_data", "number").as_i64
+      real_block = get_tronscan_block
+
+      if real_block
+        diff = (real_block - node_block).abs
+        if diff > MAXIMUM_GAP
+          raise OutOfSync.new("node is out of sync, having block #{node_block} while Tronscan block is #{real_block}, diff is #{diff}")
+        end
+      else
+        @wallet.prompt.warn("Cannot get current block from Tronscan! Your node can be out of sync, be careful, check it manually with `block` command!")
+      end
+
       @wallet.connected = true
     rescue error
       disconnect_with_warning(error)
+    end
+
+    def get_tronscan_block
+      response = HTTP::Client.get("https://apilist.tronscanapi.com/api/system/status")
+      JSON.parse(response.body).dig("full", "block").as_i64
+    rescue
+      nil
     end
 
     def reconnect
@@ -304,9 +327,10 @@ module Wallet
     end
 
     def disconnect_with_warning(error)
-      @wallet.prompt.error("Cannot connect to #{@wallet.settings["node_url"]} (#{error.message})")
-      @wallet.prompt.warn("\nUse `connect` command to restore connection or")
-      @wallet.prompt.warn("to try another node from the list (ctrl+click):")
+      problem = error.is_a?(OutOfSync) ? "It's dangerous to" : "Cannot"
+      @wallet.prompt.error("#{problem} connect to #{@wallet.settings["node_url"]} (#{error.message})")
+      @wallet.prompt.warn("\nUse `connect` command to try again or")
+      @wallet.prompt.warn("try another node from the list (ctrl+click):")
       @wallet.prompt.warn("\nhttps://tronprotocol.github.io/documentation-en/developers/official-public-nodes/")
       @wallet.prompt.warn("\nDo not forget the port, for example: `connect 3.225.171.164:8090`")
       @wallet.prompt.warn("Scheme is optional (`http` for IP and `https` for domain by default)")

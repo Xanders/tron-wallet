@@ -44,7 +44,6 @@ module Wallet
       db.setup
       @settings = db.get_settings
       @node = Wallet::Node.new(self).not_nil!
-      node.status
     end
 
     def title
@@ -54,7 +53,10 @@ module Wallet
     end
 
     def run
-      prompt.say("Log in to your account and feel great!")
+      if node.status
+        prompt.say("Node is synced. Log in to your account and feel great!")
+      end
+
       loop do
         result = prompt.ask("#{account}> ")
         break if result == "exit"
