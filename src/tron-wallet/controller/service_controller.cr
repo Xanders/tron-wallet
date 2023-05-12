@@ -43,7 +43,7 @@ module Wallet
     edit: edit application settings
 
 • connect (*node_url): try to connect to the node
-• block: print current block number
+• block: print current block number, energy and bandwidth price
 • help: print all supported commands
 • exit: shutdown the REPL
 
@@ -92,6 +92,9 @@ module Wallet
         @wallet.prompt.warn("Cannot get current block from Tronscan!")
         @wallet.prompt.warn("Check it manually at https://tronscan.org/ (ctrl+click)")
       end
+
+      @wallet.prompt.say("\nEnergy price: #{(@wallet.node.get_energy_price * Wallet::Node::TRX_TO_SUN).to_i64} SUN")
+      @wallet.prompt.say("Bandwidth price: #{(@wallet.node.get_bandwidth_price * Wallet::Node::TRX_TO_SUN).to_i64} SUN")
     rescue Wallet::Node::RequestError
       # OK, it is safe
     end

@@ -1,6 +1,7 @@
 module Wallet
   class Node
     MAXIMUM_GAP = 50
+    TRX_TO_SUN = 1000000
 
     getter conn
     @wallet : Wallet::Main
@@ -29,7 +30,7 @@ module Wallet
     end
 
     def read_money(json : JSON::Any?)
-      read_int(json) / 1000000
+      read_int(json) / TRX_TO_SUN
     end
 
     def read_money(json : JSON::Any, *field_names)
@@ -61,12 +62,12 @@ module Wallet
       balance = read_money(result, "balance")
 
       return {
-        "balance" => balance,
-        "frozen" => frozen,
-        "frozen_balance_for_energy" => frozen_balance_for_energy,
-        "frozen_balance_for_bandwidth" => frozen_balance_for_bandwidth,
-        "votes_used" => votes_sum,
-        "tron_power" => tron_power
+        balance: balance,
+        frozen: frozen,
+        frozen_balance_for_energy: frozen_balance_for_energy,
+        frozen_balance_for_bandwidth: frozen_balance_for_bandwidth,
+        votes_used: votes_sum,
+        tron_power: tron_power
       }
     end
 
@@ -80,7 +81,7 @@ module Wallet
         "visible" => true
       })
 
-      result["constant_result"]? ? result["constant_result"].as_a.first.as_s.to_i64(16) / 1000000 : 0_i64
+      result["constant_result"]? ? result["constant_result"].as_a.first.as_s.to_i64(16) / TRX_TO_SUN : 0_f64
     end
 
     def get_net_stats(address)
@@ -117,7 +118,7 @@ module Wallet
     end
 
     def transfer_trx(address : String, private_key : String, amount : Float64)
-      amount = (amount * 1000000).to_i64
+      amount = (amount * TRX_TO_SUN).to_i64
       result = post("/wallet/easytransferbyprivate", {
         "toAddress" => address,
         "privateKey" => private_key,
@@ -134,23 +135,22 @@ module Wallet
       end
     end
 
-    def transfer_token(address : String, private_key : String, contract : String, amount : Float64)
-      amount = (amount * 1000000).to_i64
+    def prepare_token_transfer(address : String, contract : String, amount : Float64)
+      amount = (amount * TRX_TO_SUN).to_i64
       parameter = Wallet::Utils.tron_params(TronAddress.to_hex(address), amount.to_s(16))
 
-      make_transaction("/wallet/triggerconstantcontract", {
+      post("/wallet/triggerconstantcontract", {
         "contract_address" => contract,
         "function_selector" => "transfer(address,uint256)",
         "parameter" => parameter,
         "owner_address" => @wallet.address.not_nil!,
-        "fee_limit" => @wallet.settings["max_commission"].to_i64 * 1000000,
-        "call_value" => 0,
+        "fee_limit" => @wallet.settings["max_commission"].to_i64 * TRX_TO_SUN,
         "visible" => true
-      }, private_key)
+      })
     end
 
     def stake(address : String, amount : Float64, duration : Int32, resource : String, receiver : String?, private_key : String)
-      amount = (amount * 1000000).to_i64
+      amount = (amount * TRX_TO_SUN).to_i64
 
       make_transaction("/wallet/freezebalance", {
         "owner_address" => address,
@@ -159,7 +159,7 @@ module Wallet
         "resource" => resource,
         "receiver_address" => receiver == address ? nil : receiver,
         "visible" => true
-      }, private_key, scoped: false)
+      }, private_key)
     end
 
     def unstake(address : String, resource : String, receiver : String?, private_key : String)
@@ -168,14 +168,14 @@ module Wallet
         "resource" => resource,
         "receiver_address" => receiver == address ? nil : receiver,
         "visible" => true
-      }, private_key, scoped: false)
+      }, private_key)
     end
 
     def claim_rewards(address : String, private_key : String)
       make_transaction("/wallet/withdrawbalance", {
         "owner_address" => address,
         "visible" => true
-      }, private_key, scoped: false)
+      }, private_key)
     end
 
     def get_witnesses_list
@@ -202,23 +202,27 @@ module Wallet
           }
         ],
         "visible" => true
-      }, private_key, scoped: false)
+      }, private_key)
     end
 
     def get_now_block
       get("/wallet/getnowblock")
     end
 
-    def make_transaction(path, params, private_key, scoped = true)
+    def get_energy_price
+      get("/wallet/getenergyprices")["prices"].as_s.split(',')[-1].split(':')[1].to_i64 / TRX_TO_SUN
+    end
+
+    def get_bandwidth_price
+      get("/wallet/getbandwidthprices")["prices"].as_s.split(',')[-1].split(':')[1].to_i64 / TRX_TO_SUN
+    end
+
+    def make_transaction(path, params, private_key)
       transaction = post(path, params)
+      sign_and_send(transaction, private_key)
+    end
 
-      if scoped
-        if transaction["transaction"]?.nil?
-          return "FAILED", transaction.to_json, nil
-        end
-        transaction = transaction["transaction"]
-      end
-
+    def sign_and_send(transaction, private_key)
       if transaction["txID"]?.nil?
         return "FAILED", transaction.to_json, nil
       end
@@ -242,13 +246,27 @@ module Wallet
     end
 
     def sign_transaction(transaction : JSON::Any, private_key : String)
-      post("/wallet/gettransactionsign", {
-        "transaction" => transaction,
-        "privateKey" => private_key,
-      })
+      ## Does not work, insecure
+      # post("/wallet/gettransactionsign", {
+      #   "transaction" => transaction,
+      #   "privateKey" => private_key,
+      # })
+
+      context = Secp256k1::Context.new
+      key = Secp256k1::Key.new Secp256k1::Num.new(private_key)
+      id = transaction["txID"].as_s
+      sig = context.sign key, Secp256k1::Num.new(id)
+
+      {
+        "signature" => [sig.compact],
+        "txID" => id,
+        "raw_data" => transaction["raw_data"],
+        "raw_data_hex" => transaction["raw_data_hex"],
+        "visible" => true
+      }
     end
 
-    def send_transaction(transaction : JSON::Any)
+    def send_transaction(transaction)
       post("/wallet/broadcasttransaction", transaction)
     end
 
@@ -266,8 +284,8 @@ module Wallet
       end
 
       @wallet.connected = true
-    rescue error
-      disconnect_with_warning(error)
+    rescue RequestError
+      # Error message already shown in `error_while_request`
     end
 
     def get_tronscan_block
@@ -299,26 +317,19 @@ module Wallet
 
     def get(path, params = nil)
       body = params.to_json if params
-
-      response = begin
-        @conn.get(path, body: body)
-      rescue error
-        error_while_request(error)
-      end
-
-      JSON.parse(response.body)
+      exec("GET", path, body)
     end
 
     def post(path, params)
       body = params.to_json
+      exec("POST", path, body)
+    end
 
-      response = begin
-        @conn.post(path, body: body)
-      rescue error
-        error_while_request(error)
-      end
-
+    def exec(method, path, body)
+      response = @conn.exec(method, path, body: body)
       JSON.parse(response.body)
+    rescue error
+      error_while_request(error)
     end
 
     def error_while_request(error)

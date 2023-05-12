@@ -12,6 +12,14 @@ shards:
     git: https://github.com/crystal-lang/crystal-db.git
     version: 0.10.1
 
+  secp256k1:
+    git: https://github.com/q9f/secp256k1.cr.git
+    version: 0.5.0
+
+  sha3:
+    git: https://github.com/oscarbarrett/crystal-sha3.git
+    version: 0.3.2
+
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git
     version: 0.18.0

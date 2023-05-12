@@ -38,7 +38,7 @@ module Wallet
       return unless authorized?
 
       balance = @wallet.node.get_trx_balance(@wallet.address.not_nil!)
-      tron_power = balance["tron_power"]
+      tron_power = balance[:tron_power]
       if tron_power.zero?
         @wallet.prompt.warn("You have no votes! Use `stake` command to obtain some.")
         return
@@ -73,7 +73,7 @@ module Wallet
 
       @wallet.prompt.warn("Note: Multivoting is not supported by this wallet!")
 
-      votes_used = balance["votes_used"]
+      votes_used = balance[:votes_used]
       if votes_used.zero?
         @wallet.prompt.warn("It's recommended to use all the votes at once. You can re-vote at any time.")
       else

@@ -1,8 +1,10 @@
 name: tron-wallet
-version: 0.1.1
+version: 0.2.0
 
 authors:
   - Lexxie Belle <lexxie@kek.ltd>
+  - Xanders <necropolis@inbox.ru>
+  - Tvoyfrut <tvoyfrut@gmail.com>
 
 description: |
   Simple console wallet
@@ -10,10 +12,13 @@ description: |
 dependencies:
   term-prompt:
     github: crystal-term/prompt
+
   sqlite3:
     github: crystal-lang/crystal-sqlite3
     version: "0.18.0"
+
   crypt:
     github: nicolab/crystal-crypt
 
-# license: MIT
+  secp256k1:
+    github: q9f/secp256k1.cr

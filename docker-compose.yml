@@ -1,4 +1,4 @@
-version: '3.9'
+name: tron-wallet
 
 services:
   app:
@@ -6,3 +6,21 @@ services:
     build: .
     volumes:
       - '.home:/home'
+
+  debug:
+    build:
+      context: .
+      target: base
+    working_dir: /project
+    volumes:
+      - '.:/project'
+    environment:
+      HOME: '/project/.home'
+    command: crystal run --error-trace src/tron-wallet.cr
+
+  repl:
+    image: 84codes/crystal:1.8.1-ubuntu-22.04
+    working_dir: /project
+    volumes:
+      - '.:/project'
+    command: i
