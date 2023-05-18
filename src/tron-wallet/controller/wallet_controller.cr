@@ -197,7 +197,7 @@ module Wallet
 
       @wallet.prompt.say("You can see your transactions history here (ctrl+click):")
       @wallet.prompt.say("\nhttps://tronscan.io/#/address/#{address}")
-      @wallet.prompt.say("\nNote: click to token transaction to see the sum")
+      @wallet.prompt.say("\nNote: for token transfers click on transaction hash to see the sum")
     end
 
     def wallet_backup(args)
@@ -317,24 +317,31 @@ module Wallet
     end
 
     def wallet_send_token(amount, address, contract, private_key)
-      transfer = @wallet.node.prepare_token_transfer(
+      estimate = @wallet.node.prepare_token_transfer(
         amount: amount,
         address: address,
-        contract: contract
+        contract: contract,
+        estimate_fee: true
       )
 
-      if transfer["transaction"]?.nil? || transfer["energy_used"]?.nil?
-        return "FAILED", transfer.to_json, nil
+      if estimate["transaction"]?.nil? || estimate["energy_used"]?.nil?
+        return "FAILED", estimate.to_json, nil
       end
 
-      energy_fee = transfer["energy_used"].as_i64
+      energy_fee = estimate["energy_used"].as_i64
       energy_price = @wallet.node.get_energy_price
-      bandwidth_fee = transfer["transaction"]["raw_data_hex"].as_s.bytesize
+      bandwidth_fee = estimate["transaction"]["raw_data_hex"].as_s.bytesize
       bandwidth_price = @wallet.node.get_bandwidth_price
 
       @wallet.prompt.say("Fee: ≈#{energy_fee} energy (≈#{(energy_fee * energy_price).format(decimal_places: 1)} TRX) and ≈#{bandwidth_fee} bandwidth (≈#{(bandwidth_fee * bandwidth_price).format(decimal_places: 1)} TRX) bandwidth")
       confirm = @wallet.prompt.no?("Confirm?")
       return unless confirm
+
+      transfer = @wallet.node.prepare_token_transfer(
+        amount: amount,
+        address: address,
+        contract: contract
+      )
 
       @wallet.node.sign_and_send(transfer["transaction"], private_key)
     end
@@ -582,8 +589,10 @@ module Wallet
       if result == "OK"
         @wallet.prompt.ok("\nTransaction successfull!")
       else
-        @wallet.prompt.error("\nTransaction failed: #{message}")
+        @wallet.prompt.error("\nTransaction failed!")
       end
+
+      @wallet.prompt.say('\n' + message) unless message == ""
     end
 
     def select_account_from_the_book

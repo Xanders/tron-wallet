@@ -44,6 +44,7 @@ module Wallet
 
 • connect (*node_url): try to connect to the node
 • block: print current block number, energy and bandwidth price
+• transaction (id): get info by given transaction ID
 • help: print all supported commands
 • exit: shutdown the REPL
 
@@ -95,6 +96,18 @@ module Wallet
 
       @wallet.prompt.say("\nEnergy price: #{(@wallet.node.get_energy_price * Wallet::Node::TRX_TO_SUN).to_i64} SUN")
       @wallet.prompt.say("Bandwidth price: #{(@wallet.node.get_bandwidth_price * Wallet::Node::TRX_TO_SUN).to_i64} SUN")
+    rescue Wallet::Node::RequestError
+      # OK, it is safe
+    end
+
+    def transaction(args)
+      id = if args.any?
+        args.shift
+      else
+        @wallet.prompt.ask("Transaction ID:", required: true)
+      end
+
+      show_transaction_result *@wallet.node.get_transaction(id)
     rescue Wallet::Node::RequestError
       # OK, it is safe
     end

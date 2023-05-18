@@ -44,7 +44,7 @@ module Wallet
     include WitnessController
 
     @wallet : Wallet::Main
-    initialize_commands(%w(wallet contracts book witness settings connect block help))
+    initialize_commands(%w(wallet contracts book witness settings connect block transaction help))
     def initialize(@wallet); end
 
     def initial_setup

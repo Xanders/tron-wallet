@@ -135,16 +135,20 @@ module Wallet
       end
     end
 
-    def prepare_token_transfer(address : String, contract : String, amount : Float64)
+    def prepare_token_transfer(address : String, contract : String, amount : Float64, estimate_fee = false)
+      method = estimate_fee ? "triggerconstantcontract" : "triggersmartcontract"
+
       amount = (amount * TRX_TO_SUN).to_i64
       parameter = Wallet::Utils.tron_params(TronAddress.to_hex(address), amount.to_s(16))
+      fee_limit = @wallet.settings["max_commission"].to_i64 * TRX_TO_SUN
 
-      post("/wallet/triggerconstantcontract", {
+      post("/wallet/#{method}", {
         "contract_address" => contract,
         "function_selector" => "transfer(address,uint256)",
         "parameter" => parameter,
         "owner_address" => @wallet.address.not_nil!,
-        "fee_limit" => @wallet.settings["max_commission"].to_i64 * TRX_TO_SUN,
+        "fee_limit" => fee_limit,
+        "call_value" => 0,
         "visible" => true
       })
     end
@@ -239,7 +243,8 @@ module Wallet
       id = sended["txid"].as_s
 
       if sended["result"]? && sended["result"].as_bool == true
-        return "OK", "", id
+        sleep 5 # Waiting for the info can be retrieved
+        return get_transaction(id)
       else
         return "FAILED", sended.to_json, id
       end
@@ -268,6 +273,45 @@ module Wallet
 
     def send_transaction(transaction)
       post("/wallet/broadcasttransaction", transaction)
+    end
+
+    def get_transaction(id)
+      info = post("/wallet/gettransactioninfobyid", {"value": id})
+
+      maybe_result = info.dig? "receipt", "result"
+      if maybe_result
+        result = maybe_result.as_s
+      else
+        return "OK", "But no additional info available yet...\nUse `transaction` command later", id
+      end
+
+      energy_used = read_int(info, "receipt", "energy_usage")
+      sun_burned_for_energy = read_int(info, "receipt", "energy_fee")
+      bandwidth_used = read_int(info, "receipt", "net_usage")
+      sun_burned_for_bandwidth = read_int(info, "receipt", "net_fee")
+      trx_burned = (sun_burned_for_energy + sun_burned_for_bandwidth) / TRX_TO_SUN
+
+      fee_elements = [
+        ("#{trx_burned.format} TRX" if trx_burned > 0),
+        ("#{energy_used.format} energy" if energy_used > 0),
+        ("#{bandwidth_used.format} bandwidth" if bandwidth_used > 0)
+      ].compact
+
+      fee = "Fee: #{fee_elements.any? ? fee_elements.join(", ") : "none"}"
+
+      if result == "SUCCESS"
+        return "OK", fee, id
+      else
+        details = if info["resMessage"]?
+          String.new TronAddress.hex_to_bytes info["resMessage"].as_s
+        else
+          "not provided"
+        end
+
+        message = "Result: #{result}\nDetails: #{details}\n#{fee}"
+
+        return "FAILED", message, id
+      end
     end
 
     def status
