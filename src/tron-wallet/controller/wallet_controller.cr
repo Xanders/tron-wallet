@@ -264,7 +264,7 @@ module Wallet
 
       address = case @wallet.prompt.select("Select method:", ["Enter address", "Select from addressbook", "Select another account in the wallet"])
       when "Enter address"
-        @wallet.prompt.ask("Address", required: true)
+        @wallet.prompt.ask("Address:", required: true)
       when "Select from addressbook"
         select_account_from_the_book
       when "Select another account in the wallet"
