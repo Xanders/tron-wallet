@@ -40,17 +40,38 @@ module Wallet
     def get_trx_balance(address)
       result = post("/wallet/getaccount", {"address" => address, "visible" => true})
 
+      frozen_balance_for_energy = 0.0
       frozen_balance_for_bandwidth = 0.0
-      if result["frozen"]?
-        result["frozen"].as_a.each do |f|
-          frozen_balance_for_bandwidth += read_money(f, "frozen_balance")
+
+      if result["frozenV2"]?
+        result["frozenV2"].as_a.each do |field|
+          amount = read_money(field, "amount")
+
+          case field["type"]?
+          when "ENERGY"
+            frozen_balance_for_energy += amount
+          when "BANDWIDTH", nil # Yes, empty field means bandwidth
+            frozen_balance_for_bandwidth += amount
+          when "TRON_POWER"
+            # Do nothing: there is no `amount` field!
+          end
         end
       end
 
-      frozen_balance_for_energy = read_money(result, "account_resource", "frozen_balance_for_energy", "frozen_balance")
-
       frozen = frozen_balance_for_bandwidth + frozen_balance_for_energy
-      tron_power = frozen.to_i32
+
+      frozen_v1_balance_for_bandwidth = 0.0
+      if result["frozen"]?
+        result["frozen"].as_a.each do |field|
+          frozen_v1_balance_for_bandwidth += read_money(field, "frozen_balance")
+        end
+      end
+
+      frozen_v1_balance_for_energy = read_money(result, "account_resource", "frozen_balance_for_energy", "frozen_balance")
+
+      frozen_v1 = frozen_v1_balance_for_bandwidth + frozen_v1_balance_for_energy
+
+      tron_power = frozen.to_i32 + frozen_v1.to_i32
 
       votes_sum = 0
       if result["votes"]?
@@ -66,6 +87,9 @@ module Wallet
         frozen: frozen,
         frozen_balance_for_energy: frozen_balance_for_energy,
         frozen_balance_for_bandwidth: frozen_balance_for_bandwidth,
+        frozen_v1: frozen_v1,
+        frozen_v1_balance_for_energy: frozen_v1_balance_for_energy,
+        frozen_v1_balance_for_bandwidth: frozen_v1_balance_for_bandwidth,
         votes_used: votes_sum,
         tron_power: tron_power
       }
@@ -153,20 +177,28 @@ module Wallet
       })
     end
 
-    def stake(address : String, amount : Float64, duration : Int32, resource : String, receiver : String?, private_key : String)
+    def stake(address : String, amount : Float64, resource : String, private_key : String)
       amount = (amount * TRX_TO_SUN).to_i64
 
-      make_transaction("/wallet/freezebalance", {
+      make_transaction("/wallet/freezebalancev2", {
         "owner_address" => address,
         "frozen_balance" => amount,
-        "frozen_duration" => duration,
         "resource" => resource,
-        "receiver_address" => receiver == address ? nil : receiver,
         "visible" => true
       }, private_key)
     end
 
-    def unstake(address : String, resource : String, receiver : String?, private_key : String)
+    def unstake(address : String, amount : Float64, resource : String, private_key : String)
+      amount = (amount * TRX_TO_SUN).to_i64
+      make_transaction("/wallet/unfreezebalancev2", {
+        "owner_address" => address,
+        "unfreeze_balance" => amount,
+        "resource" => resource,
+        "visible" => true
+      }, private_key)
+    end
+
+    def unstake_v1(address : String, resource : String, receiver : String?, private_key : String)
       make_transaction("/wallet/unfreezebalance", {
         "owner_address" => address,
         "resource" => resource,
@@ -278,13 +310,6 @@ module Wallet
     def get_transaction(id)
       info = post("/wallet/gettransactioninfobyid", {"value": id})
 
-      maybe_result = info.dig? "receipt", "result"
-      if maybe_result
-        result = maybe_result.as_s
-      else
-        return "OK", "But no additional info available yet...\nUse `transaction` command later", id
-      end
-
       energy_used = read_int(info, "receipt", "energy_usage")
       sun_burned_for_energy = read_int(info, "receipt", "energy_fee")
       bandwidth_used = read_int(info, "receipt", "net_usage")
@@ -298,6 +323,17 @@ module Wallet
       ].compact
 
       fee = "Fee: #{fee_elements.any? ? fee_elements.join(", ") : "none"}"
+
+      maybe_result = info.dig? "receipt", "result"
+      if maybe_result
+        result = maybe_result.as_s
+      else
+        if fee_elements.any?
+          return "OK", "#{fee}\nUse `transaction` command later if you expect any other details", id
+        else
+          return "OK", "But no additional info available yet...\nUse `transaction` command later", id
+        end
+      end
 
       if result == "SUCCESS"
         return "OK", fee, id

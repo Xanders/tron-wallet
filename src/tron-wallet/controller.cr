@@ -25,7 +25,7 @@ macro initialize_commands(list)
     when {{value}} then {{value.id}}(args)
     {% end %}
     else
-      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake unstake claim rename change_password))
+      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake unstake unstake_v1 claim rename change_password))
     end
   ensure
     @wallet.prompt.say("\n")

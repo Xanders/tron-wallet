@@ -17,7 +17,8 @@ module Wallet
     balance (*account_name): show account balance # `ps` is an alias
     send: send TRX or TRC20 token
     stake: stake TRX to gain energy or bandwidth
-    unstake: release the TRX stake after it's duration
+    unstake: release the TRX stake made at Freeze 2.0 era
+    unstake_v1: release the TRX stake made at Freeze 1.0 era
     claim: claim TRX for voting rewards
     rename (*old_name (*new_name)): change account name
     change_password (*account_name): change account password
