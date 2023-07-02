@@ -47,7 +47,7 @@ repl:
 	docker compose run --rm repl
 
 # Build and push Docker image
-deploy: build push
+deploy: image push
 
 # Build the Docker image
 image:
