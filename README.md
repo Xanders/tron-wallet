@@ -31,7 +31,7 @@ With this wallet, you can connect to any Tron node in mainnet or testnet.
 Using various commands you can create or import any number
 of key-address pairs (**accounts**). Each account has its own password,
 used to encrypt your private key in the local SQLite.
-So even with your SQLite file, `wallet.`db`, a marvelous actor cannot access your money.
+So even with your SQLite file, `wallet.db`, a marvelous actor cannot access your money.
 
 **It's recommended to backup your `wallet.db` on the external drive
 and your passwords in a physical paper notebook. Do it every time you add
@@ -167,11 +167,11 @@ Consider using the `debug` wallet command to see API requests and responses.
 
 ## TODO
 
-[ ] Refactor source, add with_decrypt block
-[x] Show energy and bandwidth in balance
-[x] Add stacking TRX
-[ ] Add inline swap coins through exchange
-[ ] Add autocomplete commands by TAB
-[x] Edit wallet names
-[ ] Edit contracts, book records
-[x] Add link to transactions on TronScan
+- [ ] Refactor source, add with_decrypt block
+- [x] Show energy and bandwidth in balance
+- [x] Add stacking TRX
+- [ ] Add inline swap coins through exchange
+- [ ] Add autocomplete commands by TAB
+- [x] Edit wallet names
+- [ ] Edit contracts, book records
+- [x] Add link to transactions on TronScan

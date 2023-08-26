@@ -56,10 +56,12 @@ deploy: image push
 # Build the Docker image
 image:
 	docker compose build app
+	docker tag xanders/tron-wallet xanders/tron-wallet:$$(docker compose run --rm debug shards version | tail -1)
 
 # Push the Docker image to registry
 push:
 	docker compose push app
+	docker push xanders/tron-wallet:$$(docker compose run --rm debug shards version | tail -1)
 
 # Pull the Docker image from registry
 pull:
