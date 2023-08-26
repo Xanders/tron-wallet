@@ -1,5 +1,7 @@
 name: tron-wallet
-version: 0.2.0
+version: 1.0.0
+license: MIT
+repository: https://github.com/Xanders/tron-wallet
 
 authors:
   - Lexxie Belle <lexxie@kek.ltd>
@@ -7,7 +9,10 @@ authors:
   - Tvoyfrut <tvoyfrut@gmail.com>
 
 description: |
-  Simple console wallet
+  Simple Tron CLI-wallet without backdoors
+  (trust me, I am very honest)
+
+crystal: ">= 1.8"
 
 dependencies:
   term-prompt:

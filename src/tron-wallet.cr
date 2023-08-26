@@ -17,59 +17,74 @@ require "./tron-wallet/utils"
 
 module Wallet
   class Main
-    getter prompt : Term::Prompt
-    property settings
-    property account, address
+    getter prompt do Term::Prompt.new end
+
+    # Cannot initialize them in initializer: https://github.com/crystal-lang/crystal/issues/12449
+    getter controller do Controller.new(self) end
+    getter db do DB.new(self) end
+    getter node do Node.new(self) end
+
+    property settings : Hash(String, String) do db.get_settings end
+    property account : String?
+    property address : String?
     property connected = false
-    @controller : Wallet::Controller?
-    @db : Wallet::DB?
-    @node : Wallet::Node?
-    @account : String?
-    @address : String?
+    property debug = false
 
     def initialize
-      @prompt = Term::Prompt.new()
-      @settings = {} of String => String
-      @account = nil
-      @address = nil
-      title
-    end
-
-    def node; @node.not_nil!; end
-    def controller; @controller.not_nil!; end
-    def db; @db.not_nil!; end
-
-    def setup
-      @controller = Wallet::Controller.new(self).not_nil!
-      @db = Wallet::DB.new(self).not_nil!
+      intro
       db.setup
-      @settings = db.get_settings
-      @node = Wallet::Node.new(self).not_nil!
     end
 
-    def title
-      prompt.say("Tron wallet 0.1.3")
-      prompt.say("Print `help` to see all commands")
-      prompt.say("\n")
+    def intro
+      prompt.ok("\nTron Wallet #{{{ `shards version #{__DIR__}`.stringify }}}")
+      prompt.warn("WARNING: THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, under MIT license.")
+      prompt.warn("That means you can lose all your real money and we will not care about. Sorry.\n")
+
+      if controller.one_password_for_all_mode?
+        prompt.error("You're using `TRON_WALLET_ONE_INSECURE_PASSWORD`, please be sure you're on testnet, never use it on mainnet!\n")
+      end
+
+      prompt.keypress("Press any key if you understand that")
     end
 
     def run
+      prompt.say("\nConnecting to #{settings["node_url"]}")
+
       if node.status
         prompt.say("Node is synced. Log in to your account and feel great!")
       end
+
+      controller.fill_contracts_from_env!
+
+      prompt.say("Enter `help` to see all the commands")
+
+      want_to_exit = false
 
       loop do
         result = prompt.ask("#{account}> ")
         break if result == "exit"
         next unless result
+        want_to_exit = false
         controller.process(result.not_nil!)
       rescue Term::Reader::InputInterrupt
-        prompt.say("^C\n")
+        if want_to_exit
+          break
+        else
+          prompt.say("^C")
+          prompt.say("Press again if you want to exit", color: :dark_grey)
+          want_to_exit = true
+        end
       end
+    end
+
+    def debug?
+      @debug
+    end
+
+    def debug!(message)
+      prompt.say("DEBUG: " + message, color: :dim_grey) if debug?
     end
   end
 end
 
-wallet = Wallet::Main.new
-wallet.setup
-wallet.run
+Wallet::Main.new.run

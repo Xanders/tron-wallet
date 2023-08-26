@@ -1,13 +1,15 @@
 module Wallet
   module WalletController
+    WALLET_COMMANDS = %w(login logout list create import delete address history backup balance send stake unstake unstake_v1 withdraw claim rename change_password)
+
     def wallet(args)
       command = if args.any?
         args.shift
       else
-        @wallet.prompt.select("Select command", %w(login logout list create import delete address history backup balance send stake unstake unstake_v1 claim rename change_password)).not_nil!
+        @wallet.prompt.select("Select command:", WALLET_COMMANDS).not_nil!
       end
 
-      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake unstake unstake_v1 claim rename change_password))
+      generate_case("wallet", WALLET_COMMANDS)
     end
 
     def wallet_login(args)
@@ -32,10 +34,8 @@ module Wallet
         return
       end
 
-      password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
-
       encrypted = data[account]
-      decrypted_data = @wallet.db.decrypt(encrypted, password)
+      decrypted_data = @wallet.db.decrypt(encrypted, ask_for_password)
       @wallet.account = account
       @wallet.address = decrypted_data["address"]
       @wallet.prompt.ok("Succesfully logged to #{account} (#{@wallet.address})")
@@ -73,21 +73,22 @@ module Wallet
         return
       end
       
-      password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
-      password_repeat = @wallet.prompt.mask("Confirm password:", required: true)
+      password = ask_for_password
+      password_repeat = ask_for_password("Confirm password:")
 
       if password != password_repeat
-        @wallet.prompt.error("Passwords not equal")
+        @wallet.prompt.error("Passwords are not equal!")
         return
       end
 
-      result = @wallet.node.generate_address
-      data = {"address" => result["address"].as_s, "key" => result["privateKey"].as_s}
+      address, private_key = @wallet.node.generate_address
+      data = {"address" => address, "key" => private_key}
       encrypted = @wallet.db.encrypt(data.to_json, password)
 
       @wallet.db.create_account(name, encrypted)
-      @wallet.prompt.ok("Account #{name} created! Your address - #{data["address"]}")
-      @wallet.prompt.say("Do not forget to fill it with some TRX for activation and commissions before sending any tokens")
+      @wallet.prompt.ok("Account #{name} created! Your address - #{address}")
+      @wallet.prompt.say("Do not forget to fill it with some TRX for activation and fees before sending any tokens")
+      @wallet.prompt.warn("\nWARNING: There is no guarantee the private-key-to-address algorithm used in this wallet is matching current Tron version! Please test outgoing transaction from this wallet with small TRX amount BEFORE sending big amount of TRX or tokens here!\n")
     rescue Wallet::Node::RequestError
       # OK, it is safe
     end
@@ -112,11 +113,11 @@ module Wallet
         @wallet.prompt.ask("Enter address:", required: true)
       end
       
-      password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
-      password_repeat = @wallet.prompt.mask("Confirm password:", required: true)
+      password = ask_for_password
+      password_repeat = ask_for_password("Confirm password:")
 
       if password != password_repeat
-        @wallet.prompt.error("Passwords not equal")
+        @wallet.prompt.error("Passwords are not equal!")
         return
       end
 
@@ -145,10 +146,9 @@ module Wallet
       confirm = @wallet.prompt.no?("Delete this account?")
       return unless confirm
 
-      password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
       data = @wallet.db.get_account(account)
       encrypted = data[account]
-      @wallet.db.decrypt(encrypted, password)
+      @wallet.db.decrypt(encrypted, ask_for_password)
       @wallet.db.delete_account(account)
       @wallet.account = nil
       @wallet.address = nil
@@ -172,9 +172,8 @@ module Wallet
         return
       end
 
-      password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
       encrypted = data[account]
-      decrypted_data = @wallet.db.decrypt(encrypted, password)
+      decrypted_data = @wallet.db.decrypt(encrypted, ask_for_password)
       address = decrypted_data["address"]
       @wallet.prompt.say(address)
     rescue OpenSSL::Cipher::Error
@@ -197,7 +196,8 @@ module Wallet
 
       @wallet.prompt.say("You can see your transactions history here (ctrl+click):")
       @wallet.prompt.say("\nhttps://tronscan.io/#/address/#{address}")
-      @wallet.prompt.say("\nNote: for token transfers click on transaction hash to see the sum")
+      @wallet.prompt.say("\nNote #1: for token transfers click on transaction hash to see the sum", color: :dark_grey)
+      @wallet.prompt.say("\nNote #2: if you are on testnet, use another domain, for example shasta.tronscan.org", color: :dark_grey)
     end
 
     def wallet_backup(args)
@@ -208,11 +208,9 @@ module Wallet
         @wallet.account
       end
       
-      password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
-      
       data = @wallet.db.get_account(account)
       encrypted = data[account]
-      data = @wallet.db.decrypt(encrypted, password)
+      data = @wallet.db.decrypt(encrypted, ask_for_password)
       address = data["address"]
       key = data["key"]
       @wallet.prompt.say("Address: #{address}")
@@ -239,16 +237,22 @@ module Wallet
 
       stats = @wallet.node.get_net_stats(address)
       @wallet.prompt.say("Bandwidth: #{stats["bandwidth_free"]}/#{stats["bandwidth_limit"]}. Energy: #{stats["energy_free"]}/#{stats["energy_limit"]}")
+
       reward = @wallet.node.get_unclaimed_rewards(address)
       if reward > 0
-        @wallet.prompt.say("Unclaimed rewards: #{reward} TRX")
+        @wallet.prompt.say("Unclaimed rewards: #{reward} TRX, use `claim` command to obtain it")
       end
 
       balance_info = @wallet.node.get_trx_balance(address)
       @wallet.prompt.say("TRX: #{balance_info[:balance].format}. Staked: #{balance_info[:frozen]} (E: #{balance_info[:frozen_balance_for_energy]}, BW: #{balance_info[:frozen_balance_for_bandwidth]}). Votes used: #{balance_info[:votes_used]}/#{balance_info[:tron_power]}")
 
+      withdrawable = @wallet.node.get_withdrawable_balance(address)
+      if withdrawable > 0
+        @wallet.prompt.warn("Your #{withdrawable} TRX was fully unstaked, you now able to `withdraw` it to your balance!")
+      end
+
       if balance_info[:frozen_v1] > 0
-        @wallet.prompt.warn("Deprecated Freeze 1.0 found! #{balance_info[:frozen_v1]} TRX (E: #{balance_info[:frozen_v1_balance_for_energy]}, BW: #{balance_info[:frozen_v1_balance_for_bandwidth]}). Use `unstake_v1` command and `stake` again for Freeze 2.0 version.")
+        @wallet.prompt.warn("Deprecated Stake 1.0 found! #{balance_info[:frozen_v1]} TRX (E: #{balance_info[:frozen_v1_balance_for_energy]}, BW: #{balance_info[:frozen_v1_balance_for_bandwidth]}). Use `unstake_v1` command and `stake` again for Stake 2.0 version.")
       end
 
       contracts = @wallet.db.get_contracts
@@ -354,8 +358,12 @@ module Wallet
       return unless connected?
       return unless authorized?
 
+      @wallet.prompt.warn("\nWARNING: At the moment of implementing, unstake time for Stake 2.0 system is 14 days! You will not be able to use your TRX for two weeks after unstake!\nAlso, number of unstakes per account is limited to 32.")
+      confirm = @wallet.prompt.yes?("Is it OK for you?")
+      return unless confirm
+
       balance = @wallet.node.get_trx_balance(@wallet.address)[:balance]
-      @wallet.prompt.say("Balance: #{balance.format}")
+      @wallet.prompt.say("\nBalance: #{balance.format}")
       input = @wallet.prompt.ask("Enter amount:", default: "all", required: true).not_nil!
       amount = input == "all" ? balance : input.to_f64
 
@@ -452,6 +460,8 @@ module Wallet
           private_key: private_key
         ))
       end
+
+      @wallet.prompt.warn("Your TRX will be available in a two weeks (at the moment of implementing).\nBut unstaked TRX will not appended to your balance automatically, you'll need to `withdraw` them with corresponding command.")
     rescue OpenSSL::Cipher::Error
       @wallet.prompt.error("Invalid password!")
     rescue Wallet::Node::RequestError
@@ -522,6 +532,16 @@ module Wallet
       @wallet.prompt.error("\nDANGER: Result is unpredictable, double check your state before continue!")
     end
 
+    def wallet_withdraw(args)
+      return unless connected?
+      return unless authorized?
+      show_transaction_result(*@wallet.node.withdraw_unstaked_trx(@wallet.address.not_nil!, get_logged_account_key))
+    rescue OpenSSL::Cipher::Error
+      @wallet.prompt.error("Invalid password!")
+    rescue Wallet::Node::RequestError
+      @wallet.prompt.error("\nDANGER: Result is unpredictable, double check your state before continue!")
+    end
+
     def wallet_claim(args)
       return unless connected?
       return unless authorized?
@@ -582,6 +602,11 @@ module Wallet
     end
 
     def wallet_change_password(args)
+      if one_password_for_all_mode?
+        @wallet.prompt.error("You cannot change password when `TRON_WALLET_ONE_INSECURE_PASSWORD` environment variable is set!")
+        return
+      end
+
       account = if args.any?
         args.shift
       else
@@ -589,7 +614,7 @@ module Wallet
         @wallet.account
       end
 
-      old_password = @wallet.prompt.mask("Old password:", required: true).not_nil!
+      old_password = ask_for_password("Old password:")
       data = @wallet.db.get_account(account)
       encrypted = data[account]
       begin
@@ -601,11 +626,11 @@ module Wallet
 
       @wallet.prompt.warn("REMEMBER YOUR NEW PASSWORD! YOU CAN'T RESTORE PRIVATE KEY WITHOUT IT!")
 
-      new_password = @wallet.prompt.mask("New password:", required: true).not_nil!
-      new_password_repeat = @wallet.prompt.mask("Confirm new password:", required: true).not_nil!
+      new_password = ask_for_password("New password:")
+      new_password_repeat = ask_for_password("Confirm new password:")
 
       if new_password != new_password_repeat
-        @wallet.prompt.error("Passwords not equal")
+        @wallet.prompt.error("Passwords are not equal!")
         return
       end
 
@@ -624,10 +649,9 @@ module Wallet
     end
 
     def get_account_data(account, key)
-      password = @wallet.prompt.mask("Enter password:", required: true).not_nil!
       data = @wallet.db.get_account(account)
       encrypted = data[account]
-      decrypted = @wallet.db.decrypt(encrypted, password)
+      decrypted = @wallet.db.decrypt(encrypted, ask_for_password)
 
       return decrypted[key]
     end

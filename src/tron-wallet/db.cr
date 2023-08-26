@@ -5,7 +5,7 @@ module Wallet
     @conn : ::DB::Database
 
     def initialize(@wallet)
-      db_path = File.expand_path "#{ENV["HOME"]}/.local/tron-wallet"
+      db_path = File.expand_path ENV["TRON_WALLET_DB_DIR"]? || "#{ENV["HOME"]}/.local/tron-wallet"
       FileUtils.mkdir_p(db_path)
       @conn = ::DB.open "sqlite3://#{db_path}/wallet.db"
     end
@@ -38,12 +38,16 @@ module Wallet
         @wallet.prompt.warn("Addressbook table created")
       end
 
-      settings = get_settings
+      # If both envs are set, we do not need to ask user anything on start
+      unless get_settings.size == 2
+        update_settings(ENV["TRON_WALLET_DEFAULT_NODE_URL"]?, ENV["TRON_WALLET_DEFAULT_MAX_FEE"]?)
+      end
 
-      unless settings.keys.size == 2
+      # But if something was not set, ask user for both values (with defaults from existing env)
+      unless get_settings.size == 2
         @conn.exec("DELETE FROM settings")
         @wallet.prompt.warn("Wallet settings not found!")
-        @wallet.controller.initial_setup
+        @wallet.controller.ask_for_settings
       end
     end
 

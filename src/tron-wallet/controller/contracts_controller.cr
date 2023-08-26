@@ -1,13 +1,15 @@
 module Wallet
   module ContractsController
+    CONTRACT_COMMANDS = %w(list create delete)
+
     def contracts(args)
       command = if args.any?
         args.shift
       else
-        @wallet.prompt.select("Select command", %w(list create delete)).not_nil!
+        @wallet.prompt.select("Select command:", CONTRACT_COMMANDS).not_nil!
       end
 
-      generate_case("contracts", %w(list create delete))
+      generate_case("contracts", CONTRACT_COMMANDS)
     end
 
     def contracts_list(args)
@@ -88,6 +90,33 @@ module Wallet
 
       @wallet.db.delete_contract(name, address)
       @wallet.prompt.ok("Contract #{name} (#{address}) removed!")
+    end
+
+    def fill_contracts_from_env!
+      list = ENV["TRON_WALLET_PREDEFINED_CONTRACTS"]?
+      return if list.nil? || list.empty?
+
+      contracts = @wallet.db.get_contracts
+
+      list.split(",").each do |pair|
+        name, address = pair.strip.split(":", 2)
+
+        if existing = contracts[name]?
+          if existing == address
+            next
+          else
+            raise "Contract with name #{name} already exists in DB and has address #{existing}, but environment variable address #{address} does not match! If you want to add mainnet and testnet contracts at same time, choose another name."
+          end
+        end
+
+        contract_name = @wallet.node.get_contract_name(address)
+        if contract_name
+          @wallet.db.add_contract(name, address)
+          @wallet.prompt.say("Added contract #{name} (#{address} | #{contract_name})")
+        else
+          raise "Contract #{name} with address #{address} from environment variable was not found in the Tron network! Double check you use mainnet or testnet."
+        end
+      end
     end
   end
 end

@@ -18,7 +18,19 @@ module Wallet
     end
 
     def generate_address
-      get("/wallet/generateaddress")
+      ## Does not work, insecure
+      # get("/wallet/generateaddress")
+
+      ## Correct way: https://developers.tron.network/docs/account
+      private_key = Random::Secure.hex(32)
+      context = Secp256k1::Context.new
+      key = Secp256k1::Key.new Secp256k1::Num.new(private_key)
+      bytes = key.public_bytes
+      bytes = bytes[1..] if bytes.size == 65 # 5 TRX lost because of this undocumented behavior
+      keccak = Secp256k1::Util.keccak(bytes, 256)
+      hex = TronAddress::FIRST_BYTE + keccak.hex[-40..]
+      address = TronAddress.to_base58(hex)
+      return address, private_key
     end
 
     def read_int(json : JSON::Any?)
@@ -125,6 +137,17 @@ module Wallet
       }
     end
 
+    def get_withdrawable_balance(address)
+      result = post(
+        "/wallet/getcanwithdrawunfreezeamount",
+        {
+          "owner_address" => address,
+          "visible" => true
+        }
+      )
+      return read_money(result, "amount")
+    end
+
     def get_unclaimed_rewards(address)
       result = post("/wallet/getReward", {"address" => address, "visible" => true})
       return read_money(result, "reward")
@@ -143,20 +166,21 @@ module Wallet
 
     def transfer_trx(address : String, private_key : String, amount : Float64)
       amount = (amount * TRX_TO_SUN).to_i64
-      result = post("/wallet/easytransferbyprivate", {
-        "toAddress" => address,
-        "privateKey" => private_key,
+
+      ## Does not work, insecure
+      # result = post("/wallet/easytransferbyprivate", {
+      #   "toAddress" => address,
+      #   "privateKey" => private_key,
+      #   "amount" => amount,
+      #   "visible" => true
+      # })
+
+      sign_and_send(post("/wallet/createtransaction", {
+        "to_address" => address,
+        "owner_address" => @wallet.address.not_nil!,
         "amount" => amount,
         "visible" => true
-      })
-
-      transaction_id = result["transaction"]? ? result["transaction"]["txID"].as_s : ""
-
-      if result["result"]["result"]? && result["result"]["result"].as_bool? == true
-        return "OK", "", transaction_id
-      else
-        return "FAILED", result["result"].to_json, transaction_id
-      end
+      }), private_key)
     end
 
     def prepare_token_transfer(address : String, contract : String, amount : Float64, estimate_fee = false)
@@ -203,6 +227,13 @@ module Wallet
         "owner_address" => address,
         "resource" => resource,
         "receiver_address" => receiver == address ? nil : receiver,
+        "visible" => true
+      }, private_key)
+    end
+
+    def withdraw_unstaked_trx(address : String, private_key : String)
+      make_transaction("/wallet/withdrawexpireunfreeze", {
+        "owner_address" => address,
         "visible" => true
       }, private_key)
     end
@@ -406,14 +437,31 @@ module Wallet
     end
 
     def exec(method, path, body)
-      response = @conn.exec(method, path, body: body)
-      JSON.parse(response.body)
-    rescue error
-      error_while_request(error)
+      @wallet.debug!("request #{path} with body: #{body}")
+
+      begin
+        response = @conn.exec(method, path, body: body)
+      rescue error
+        error_while_request(error)
+      end
+
+      @wallet.debug!("response #{response.status} with body: #{response.body}")
+
+      begin
+        JSON.parse(response.body)
+      rescue error
+        error_while_parse(response.body)
+      end
     end
 
     def error_while_request(error)
       disconnect_with_warning(error)
+      raise RequestError.new
+    end
+
+    def error_while_parse(body)
+      @wallet.prompt.error("Cannot parse response body! Valid JSON expected, but got this:\n")
+      @wallet.prompt.warn(body)
       raise RequestError.new
     end
 

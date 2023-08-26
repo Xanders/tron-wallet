@@ -1,15 +1,15 @@
 macro generate_case(namespace, list)
   case command
-  {% for value in list %}
+  {% for value in list.resolve %}
   when {{value}} then {{namespace.id}}_{{value.id}}(args)
   {% end %}
-  {% if list.includes? "list" %}
+  {% if list.resolve.includes? "list" %}
   when "ls" then {{namespace.id}}_list(args)
   {% end %}
-  {% if list.includes? "login" %}
+  {% if list.resolve.includes? "login" %}
   when "cd" then {{namespace.id}}_login(args)
   {% end %}
-  {% if list.includes? "balance" %}
+  {% if list.resolve.includes? "balance" %}
   when "ps" then {{namespace.id}}_balance(args)
   {% end %}
   else @wallet.prompt.error("Command not found")
@@ -21,11 +21,11 @@ macro initialize_commands(list)
     command, *args = command.split(" ")
     
     case command
-    {% for value in list %}
+    {% for value in list.resolve %}
     when {{value}} then {{value.id}}(args)
     {% end %}
     else
-      generate_case("wallet", %w(login logout list create import delete address history backup balance send stake unstake unstake_v1 claim rename change_password))
+      generate_case("wallet", WALLET_COMMANDS)
     end
   ensure
     @wallet.prompt.say("\n")
@@ -44,12 +44,17 @@ module Wallet
     include WitnessController
 
     @wallet : Wallet::Main
-    initialize_commands(%w(wallet contracts book witness settings connect block transaction help))
-    def initialize(@wallet); end
+    @insecure_password : String?
 
-    def initial_setup
+    def initialize(@wallet)
+      @insecure_password = ENV["TRON_WALLET_ONE_INSECURE_PASSWORD"]?
+    end
+
+    def ask_for_settings
       settings_edit(reconnect: false)
     end
+
+    initialize_commands(SERVICE_COMMANDS)
 
     def connected?
       unless @wallet.connected
@@ -65,6 +70,16 @@ module Wallet
         return false
       end
       true
+    end
+
+    def one_password_for_all_mode?
+      !!@insecure_password
+    end
+
+    def ask_for_password(custom_prompt = nil)
+      @insecure_password || @wallet.prompt.mask(
+        custom_prompt || "Enter password:", required: true
+      ).not_nil!
     end
   end
 end

@@ -2,8 +2,10 @@ name: tron-wallet
 
 services:
   app:
-    image: registry.kek.ltd/libra-media/tron-wallet
+    image: xanders/tron-wallet
     build: .
+    tty: true
+    stdin_open: true
     volumes:
       - '.home:/home'
 

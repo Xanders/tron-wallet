@@ -2,6 +2,10 @@
 help:
 	@cat $(MAKEFILE_LIST) | docker run --rm -i xanders/make-help
 
+##
+## Without Docker
+##
+
 # Run the app
 run:
 	crystal src/tron-wallet.cr --error-trace --warnings none

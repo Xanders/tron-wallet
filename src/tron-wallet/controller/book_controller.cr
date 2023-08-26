@@ -1,13 +1,15 @@
 module Wallet
   module BookController
+    BOOK_COMMANDS = %w(list create delete)
+
     def book(args)
       command = if args.any?
         args.shift
       else
-        @wallet.prompt.select("Select command", %w(list create delete)).not_nil!
+        @wallet.prompt.select("Select command:", BOOK_COMMANDS).not_nil!
       end
 
-      generate_case("book", %w(list create delete))
+      generate_case("book", BOOK_COMMANDS)
     end
 
     def book_list(args)

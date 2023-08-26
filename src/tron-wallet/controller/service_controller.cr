@@ -1,5 +1,7 @@
 module Wallet
   module ServiceController
+    SERVICE_COMMANDS = %w(wallet contracts book witness settings help connect block transaction debug)
+
     def help(args)
       @wallet.prompt.say("
 • wallet: list wallet commands
@@ -17,8 +19,9 @@ module Wallet
     balance (*account_name): show account balance # `ps` is an alias
     send: send TRX or TRC20 token
     stake: stake TRX to gain energy or bandwidth
-    unstake: release the TRX stake made at Freeze 2.0 era
-    unstake_v1: release the TRX stake made at Freeze 1.0 era
+    unstake: release the TRX stake made at Stake 2.0 era
+    unstake_v1: release the TRX stake made at Stake 1.0 era
+    withdraw: move unstaked TRX to wallet balance
     claim: claim TRX for voting rewards
     rename (*old_name (*new_name)): change account name
     change_password (*account_name): change account password
@@ -47,9 +50,8 @@ module Wallet
 • block: print current block number, energy and bandwidth price
 • transaction (id): get info by given transaction ID
 • help: print all supported commands
+• debug: toggle printing of the raw requests and responses while using the API
 • exit: shutdown the REPL
-
-
 ")
     end
 
@@ -111,6 +113,11 @@ module Wallet
       show_transaction_result *@wallet.node.get_transaction(id)
     rescue Wallet::Node::RequestError
       # OK, it is safe
+    end
+
+    def debug(args)
+      @wallet.debug = !@wallet.debug?
+      @wallet.prompt.say("Debug mode is now #{@wallet.debug? ? "ON" : "OFF"}")
     end
   end
 end

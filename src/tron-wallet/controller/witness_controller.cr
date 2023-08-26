@@ -1,13 +1,15 @@
 module Wallet
   module WitnessController
+    WITNESS_COMMANDS = %w(list top vote brokerage)
+
     def witness(args)
       command = if args.any?
         args.shift
       else
-        @wallet.prompt.select("Select command", %w(list top vote brokerage)).not_nil!
+        @wallet.prompt.select("Select command:", WITNESS_COMMANDS).not_nil!
       end
 
-      generate_case("witness", %w(list top vote brokerage))
+      generate_case("witness", WITNESS_COMMANDS)
     end
 
     def witness_list(args)
