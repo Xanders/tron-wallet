@@ -126,7 +126,7 @@ services:
     environment:
       TRON_WALLET_DEFAULT_NODE_URL: "https://api.shasta.trongrid.io" # See https://www.trongrid.io/shasta
       TRON_WALLET_DEFAULT_MAX_FEE: "100"
-      TRON_WALLET_PREDEFINED_CONTRACTS: "USDT:TQQg4EL8o1BSeKJY4MJ8TB8XK7xufxFBvK" # This is Shasta testnet USDT address, NOT mainnet
+      TRON_WALLET_PREDEFINED_CONTRACTS: "USDT:TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs" # This is Shasta testnet USDT address, NOT mainnet
       TRON_WALLET_ONE_INSECURE_PASSWORD: "absolutely-insecure" # Please change to another insecure phrase
 
 volumes:
