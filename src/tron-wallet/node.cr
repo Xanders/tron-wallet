@@ -475,6 +475,9 @@ module Wallet
     def disconnect_with_warning(error)
       problem = error.is_a?(OutOfSync) ? "It's dangerous to" : "Cannot"
       @wallet.prompt.error("#{problem} connect to #{@wallet.settings["node_url"]} (#{error.message})")
+      if error.is_a?(OutOfSync)
+        @wallet.prompt.error("You can set `TRON_WALLET_CHECK_IS_NODE_OUT_OF_SYNC` environment variable to `false` to disable this check.")
+      end
       @wallet.prompt.warn("\nUse `connect` command to try again or")
       @wallet.prompt.warn("try another node from the list (ctrl+click):")
       @wallet.prompt.warn("\nhttps://tronprotocol.github.io/documentation-en/developers/official-public-nodes/")
