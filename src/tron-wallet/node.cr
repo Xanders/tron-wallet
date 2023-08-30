@@ -383,20 +383,27 @@ module Wallet
 
     def status
       node_block = get_now_block.dig("block_header", "raw_data", "number").as_i64
-      real_block = get_tronscan_block
 
-      if real_block
-        diff = (real_block - node_block).abs
-        if diff > MAXIMUM_GAP
-          raise OutOfSync.new("node is out of sync, having block #{node_block} while Tronscan block is #{real_block}, diff is #{diff}")
+      unless ENV["TRON_WALLET_CHECK_IS_NODE_OUT_OF_SYNC"]? == "false"
+        real_block = get_tronscan_block
+
+        if real_block
+          diff = (real_block - node_block).abs
+          if diff > MAXIMUM_GAP
+            raise OutOfSync.new("node is out of sync, having block #{node_block} while Tronscan block is #{real_block}, diff is #{diff}")
+          end
+        else
+          @wallet.prompt.warn("Cannot get current block from TronScan! Your node can be out of sync, be careful, check it manually with `block` command!")
         end
-      else
-        @wallet.prompt.warn("Cannot get current block from Tronscan! Your node can be out of sync, be careful, check it manually with `block` command!")
       end
 
       @wallet.connected = true
     rescue RequestError
       # Error message already shown in `error_while_request`
+      false
+    rescue error : OutOfSync
+      disconnect_with_warning(error)
+      false
     end
 
     def get_tronscan_block

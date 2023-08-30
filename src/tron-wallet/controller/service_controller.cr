@@ -83,7 +83,7 @@ module Wallet
 
       tronscan_block = @wallet.node.get_tronscan_block
       if tronscan_block
-        @wallet.prompt.say("Number on Tronscan: #{tronscan_block}")
+        @wallet.prompt.say("Number on TronScan: #{tronscan_block}")
 
         diff = (tronscan_block - number).abs
         diff_message = "Diff is #{diff}"
@@ -93,7 +93,7 @@ module Wallet
           @wallet.prompt.say(diff_message)
         end
       else
-        @wallet.prompt.warn("Cannot get current block from Tronscan!")
+        @wallet.prompt.warn("Cannot get current block from TronScan!")
         @wallet.prompt.warn("Check it manually at https://tronscan.org/ (ctrl+click)")
       end
 

@@ -103,6 +103,7 @@ You can use the following environment variables:
 * `TRON_WALLET_DEFAULT_MAX_FEE`: maximum allowed fee for transaction in TRX, default: ask on first start
 * `TRON_WALLET_PREDEFINED_CONTRACTS`: contracts that should be added to the database at initial startup in the form of `NAME1:address1,NAME2:address2,<...>`, default: none (see [USDT](https://tron.network/usdt), [USDC](https://tron.network/usdc))
 * `TRON_WALLET_ONE_INSECURE_PASSWORD`: when set, will be used for all password prompts, **NEVER USE IT ON MAINNET**, default: use own password for every address
+* `TRON_WALLET_CHECK_IS_NODE_OUT_OF_SYNC`: by default, Tron Wallet checks the difference between the given Tron node's current block and the current block on TronScan. The check performing at wallet startup. This is useful in case you have your own node and want to be sure it isn't stuck. However, there is no TronScan API for testnet, so in this case or case of a private Tron network you should set this variable to `false` (lowercased).
 
 *Note:* node URL and maximum commission can be adjusted in runtime
 and saved into the database via the `settings` command.
@@ -128,6 +129,7 @@ services:
       TRON_WALLET_DEFAULT_MAX_FEE: "100"
       TRON_WALLET_PREDEFINED_CONTRACTS: "USDT:TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs" # This is Shasta testnet USDT address, NOT mainnet
       TRON_WALLET_ONE_INSECURE_PASSWORD: "absolutely-insecure" # Please change to another insecure phrase
+      TRON_WALLET_CHECK_IS_NODE_OUT_OF_SYNC: "false" # Always `false` for testnet or private network
 
 volumes:
   tron-wallet:
